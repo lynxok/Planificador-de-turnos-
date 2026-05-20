@@ -1,0 +1,6 @@
+{
+  "name": "Planificador de Cobertura de Turnos",
+  "description": "Una interfaz interactiva de planificación con vista de línea de tiempo/Gantt y arrastrar-y-soltar para gestionar horarios de 43 personas agrupadas por áreas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
