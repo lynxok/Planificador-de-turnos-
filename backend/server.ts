@@ -379,6 +379,13 @@ app.post('/api/db', async (req, res) => {
   try {
     console.log("POST /api/db: Queueing upload operation...");
     const data = req.body;
+
+    // Safety guard: prevent overwriting with empty persons list due to frontend loading issues
+    if (!data.persons || !Array.isArray(data.persons) || data.persons.length === 0) {
+      console.warn("Safety guard triggered: POST payload has empty or missing persons. Aborting database overwrite to prevent data loss.");
+      return res.status(400).json({ error: "Safety guard: payload must contain at least one person." });
+    }
+
     await ftpQueue.add(async () => {
       await uploadToFtpInternal(data);
     });
