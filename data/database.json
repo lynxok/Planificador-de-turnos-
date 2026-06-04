@@ -1,0 +1,1007 @@
+{
+  "persons": [
+    {
+      "id": "p_imp_1779822187926_dih5c",
+      "name": "Zelada Isabel De Lourdes",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 20,
+      "color": "indigo",
+      "legajo": "6",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 5
+        },
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 16,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_wfan9",
+      "name": "Lopez Zulema Rafaela",
+      "area": "Art",
+      "maxDailyHours": 9,
+      "availabilityStart": 6,
+      "availabilityEnd": 16,
+      "color": "sky",
+      "legajo": "14",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 9
+        },
+        {
+          "startHour": 7,
+          "duration": 9
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_48uz5",
+      "name": "Ferro Nelida Alejandra",
+      "area": "Administración",
+      "maxDailyHours": 8,
+      "availabilityStart": 8,
+      "availabilityEnd": 16,
+      "color": "amber",
+      "legajo": "15",
+      "possibleShifts": [
+        {
+          "startHour": 8,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_ec6tx",
+      "name": "Cardoso Marcela Fabiana",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 15,
+      "color": "cyan",
+      "legajo": "17",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_89dnn",
+      "name": "Franco Lorena Vanina",
+      "area": "Administración",
+      "maxDailyHours": 9,
+      "availabilityStart": 7,
+      "availabilityEnd": 16,
+      "color": "indigo",
+      "legajo": "20",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 9
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_pujs3",
+      "name": "Wouterlood Cesar Adrian",
+      "area": "Rayos",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 13,
+      "color": "sky",
+      "legajo": "40",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 6
+        },
+        {
+          "startHour": 9,
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_dws7h",
+      "name": "Silva Carina Itatí",
+      "area": "Administración",
+      "maxDailyHours": 9,
+      "availabilityStart": 7,
+      "availabilityEnd": 17,
+      "color": "amber",
+      "legajo": "47",
+      "possibleShifts": [
+        {
+          "startHour": 7.5,
+          "duration": 9
+        },
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_66dec",
+      "name": "Busti Lilian",
+      "area": "Admision",
+      "maxDailyHours": 9,
+      "availabilityStart": 10,
+      "availabilityEnd": 20,
+      "color": "cyan",
+      "legajo": "49",
+      "possibleShifts": [
+        {
+          "startHour": 10,
+          "duration": 9
+        },
+        {
+          "startHour": 11,
+          "duration": 9
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_inkj7",
+      "name": "Gareis Claudia Teresita",
+      "area": "Administración",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 14,
+      "color": "indigo",
+      "legajo": "55",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_pnpag",
+      "name": "Duarte Patricia Liliana",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "sky",
+      "legajo": "58",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_ndbya",
+      "name": "Martinez Maria Cristina",
+      "area": "Maestranza",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 22,
+      "color": "amber",
+      "legajo": "59",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_def82",
+      "name": "Laiker Silvina  Maria",
+      "area": "Quirofano",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 14,
+      "color": "cyan",
+      "legajo": "61",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_44vmh",
+      "name": "Diana Sandra Vanesa",
+      "area": "Art",
+      "maxDailyHours": 9,
+      "availabilityStart": 7,
+      "availabilityEnd": 20,
+      "color": "indigo",
+      "legajo": "77",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 11,
+          "duration": 9
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_j9kya",
+      "name": "Delgado Alberto Javier",
+      "area": "Mantenimiento",
+      "maxDailyHours": 9,
+      "availabilityStart": 6,
+      "availabilityEnd": 15,
+      "color": "sky",
+      "legajo": "78",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 9
+        },
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_tw3tb",
+      "name": "Dans Carlos Luciano",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "amber",
+      "legajo": "79",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 16,
+          "duration": 4
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_3t2u3",
+      "name": "Yuskowich Gladys Judith",
+      "area": "Quirofano",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 14,
+      "color": "cyan",
+      "legajo": "81",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_spxb0",
+      "name": "Bravo Guillermo Eduardo",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "indigo",
+      "legajo": "87",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 16,
+          "duration": 4
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_fb2dn",
+      "name": "Viola Alcides Gustavo",
+      "area": "Administración",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 13,
+      "color": "sky",
+      "legajo": "101",
+      "possibleShifts": [
+        {
+          "startHour": 6.5,
+          "duration": 6.5
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_awhcj",
+      "name": "Leon Sara Araceli Milena",
+      "area": "Admision",
+      "maxDailyHours": 9,
+      "availabilityStart": 6,
+      "availabilityEnd": 15,
+      "color": "amber",
+      "legajo": "106",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 9
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_dc4lb",
+      "name": "Monzon Maria Florencia",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "cyan",
+      "legajo": "111",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_xr8dp",
+      "name": "Romero Roger Fabián",
+      "area": "Rayos",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 20,
+      "color": "indigo",
+      "legajo": "114",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 6
+        },
+        {
+          "startHour": 9,
+          "duration": 3
+        },
+        {
+          "startHour": 14,
+          "duration": 6
+        },
+        {
+          "startHour": 16,
+          "duration": 3
+        },
+        {
+          "startHour": 17,
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_il10i",
+      "name": "Sanchez Ana Paula",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "sky",
+      "legajo": "120",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_cmqyc",
+      "name": "Goetz Jésica Melina",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "amber",
+      "legajo": "127",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_gtor9",
+      "name": "Emeri Edith Elizabeth",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 22,
+      "availabilityEnd": 24,
+      "color": "cyan",
+      "legajo": "128",
+      "possibleShifts": [
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_21838",
+      "name": "Vicentín Ortíz María Paula",
+      "area": "Admision",
+      "maxDailyHours": 9,
+      "availabilityStart": 7,
+      "availabilityEnd": 16,
+      "color": "indigo",
+      "legajo": "130",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 9
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_2gckn",
+      "name": "Bergamasco Viviana Fernanda",
+      "area": "Admision",
+      "maxDailyHours": 9,
+      "availabilityStart": 11,
+      "availabilityEnd": 20,
+      "color": "sky",
+      "legajo": "131",
+      "possibleShifts": [
+        {
+          "startHour": 11,
+          "duration": 9
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_uozld",
+      "name": "Schmidt Lucas Nahuel",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 22,
+      "color": "amber",
+      "legajo": "133",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_nrpz0",
+      "name": "Barreto Maria Silvia",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "cyan",
+      "legajo": "137",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 16,
+          "duration": 4
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_d01fu",
+      "name": "Delaloye Victoria Martina",
+      "area": "Quirofano",
+      "maxDailyHours": 9,
+      "availabilityStart": 6,
+      "availabilityEnd": 15,
+      "color": "indigo",
+      "legajo": "139",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 9
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_44v6u",
+      "name": "Reynoso Gladis Beatriz",
+      "area": "Quirofano",
+      "maxDailyHours": 10,
+      "availabilityStart": 6,
+      "availabilityEnd": 22,
+      "color": "sky",
+      "legajo": "140",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 12,
+          "duration": 10
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_2keda",
+      "name": "Gottig Antonella Guadalupe",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 20,
+      "color": "amber",
+      "legajo": "145",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 6
+        },
+        {
+          "startHour": 9,
+          "duration": 3
+        },
+        {
+          "startHour": 14,
+          "duration": 6
+        },
+        {
+          "startHour": 16,
+          "duration": 3
+        },
+        {
+          "startHour": 17,
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_voncw",
+      "name": "Abalos Brian Alexis",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "cyan",
+      "legajo": "146",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 16,
+          "duration": 4
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_42fuw",
+      "name": "Grandoli Exequiel Matías",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "indigo",
+      "legajo": "147",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 11,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_25x2x",
+      "name": "Terranova Laura Maria Del Valle",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 12,
+      "availabilityEnd": 22,
+      "color": "sky",
+      "legajo": "150",
+      "possibleShifts": [
+        {
+          "startHour": 12,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_u63f7",
+      "name": "Yacopetti Gabriela",
+      "area": "Maestranza",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 22,
+      "color": "amber",
+      "legajo": "151",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_o5hto",
+      "name": "Mora Rojas Julian Andres",
+      "area": "Admision",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "cyan",
+      "legajo": "156",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_3lk3q",
+      "name": "Gonzalez Buttazzoni Sol Valeria",
+      "area": "Rayos",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 20,
+      "color": "indigo",
+      "legajo": "163",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 6
+        },
+        {
+          "startHour": 9,
+          "duration": 3
+        },
+        {
+          "startHour": 14,
+          "duration": 6
+        },
+        {
+          "startHour": 16,
+          "duration": 3
+        },
+        {
+          "startHour": 17,
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_m5z2u",
+      "name": "Sanchez Maria Lucrecia",
+      "area": "Maestranza",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 22,
+      "color": "sky",
+      "legajo": "165",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_oar1o",
+      "name": "Arnaldi Laura Guadalupe",
+      "area": "Maestranza",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 22,
+      "color": "amber",
+      "legajo": "168",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_00lr2",
+      "name": "Garcia Vitor Gabriel",
+      "area": "Informatica",
+      "maxDailyHours": 8,
+      "availabilityStart": 7,
+      "availabilityEnd": 13,
+      "color": "cyan",
+      "legajo": "173",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 6
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_fteha",
+      "name": "Ramirez Nair",
+      "area": "Admision",
+      "maxDailyHours": 9,
+      "availabilityStart": 8,
+      "availabilityEnd": 22,
+      "color": "indigo",
+      "legajo": "174",
+      "possibleShifts": [
+        {
+          "startHour": 8,
+          "duration": 9
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_m92oc",
+      "name": "Rivarola Andrea Paola",
+      "area": "Enfermera",
+      "maxDailyHours": 8,
+      "availabilityStart": 6,
+      "availabilityEnd": 24,
+      "color": "sky",
+      "legajo": "175",
+      "possibleShifts": [
+        {
+          "startHour": 6,
+          "duration": 8
+        },
+        {
+          "startHour": 14,
+          "duration": 8
+        },
+        {
+          "startHour": 22,
+          "duration": 8
+        }
+      ]
+    },
+    {
+      "id": "p_imp_1779822187926_ajonx",
+      "name": "Perdomo Facundo Exequiel",
+      "area": "Internacion",
+      "maxDailyHours": 9,
+      "availabilityStart": 7,
+      "availabilityEnd": 16,
+      "color": "amber",
+      "legajo": "180",
+      "possibleShifts": [
+        {
+          "startHour": 7,
+          "duration": 9
+        },
+        {
+          "startHour": 8,
+          "duration": 4
+        }
+      ]
+    }
+  ],
+  "shifts": [],
+  "targets": [],
+  "areas": [
+    "Atención",
+    "Soporte",
+    "Ventas",
+    "Administración",
+    "Admision",
+    "Art",
+    "Rayos",
+    "Enfermera",
+    "Maestranza",
+    "Quirofano",
+    "Mantenimiento",
+    "Informatica",
+    "Internacion"
+  ],
+  "demand": [],
+  "attendance": []
+}

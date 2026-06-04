@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Person, Shift, Area, TargetCoverage } from './types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Person, Shift, Area, TargetCoverage, DemandRecord, AttendanceRecord } from './types';
+import { fetchDb, saveDb } from './api';
 import { SEEDED_PERSONS, INITIAL_SHIFTS, DEFAULT_TARGETS, DAYS_OF_WEEK } from './seedData';
+import { FERIADOS_2026 } from './feriados';
 import { 
   formatHour, 
   getDayOfWeekFromDate, 
@@ -16,7 +18,10 @@ import { PeopleSidebar } from './components/PeopleSidebar';
 import { TimelineGrid } from './components/TimelineGrid';
 import { CoverageChart } from './components/CoverageChart';
 import { ShiftEditorModal } from './components/ShiftEditorModal';
+import { PersonEditorModal } from './components/PersonEditorModal';
 import { ExcelImporterModal } from './components/ExcelImporterModal';
+import { DemandCalculatorModal } from './components/DemandCalculatorModal';
+import { AttendanceTrackerModal } from './components/AttendanceTrackerModal';
 import { ThemeSelector } from './components/ThemeSelector';
 import { THEMES } from './themes';
 
@@ -33,7 +38,8 @@ import {
   FileSpreadsheet,
   Undo,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Save
 } from 'lucide-react';
 
 export default function App() {
@@ -54,10 +60,19 @@ export default function App() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [targets, setTargets] = useState<TargetCoverage[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
+  const [demand, setDemand] = useState<DemandRecord[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
   // 2. Navigation/View States
-  const [activeDate, setActiveDate] = useState('2026-05-18'); // Defaults to Monday May 18, 2026
-  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [activeDate, setActiveDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis'>('day');
   const [activeArea, setActiveArea] = useState<Area>('Atención');
   const [activeTab, setActiveTab] = useState<Area | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,10 +82,31 @@ export default function App() {
   const [draggedOverDate, setDraggedOverDate] = useState<string | null>(null);
   const [selectedPersonFilterId, setSelectedPersonFilterId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  // Generate date list for May 2026
-  const monthDays = generateMonthDays(2026, 4); // May (0-based 4)
+  // Compute current year and month dynamically based on activeDate state to support infinite navigation
+  const dateObj = new Date(activeDate + 'T00:00:00');
+  const currentYear = dateObj.getFullYear();
+  const currentMonth = dateObj.getMonth();
+  
+  const activeMonthName = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ][currentMonth];
+
+  // Generate date list dynamically for the current month/year
+  const monthDays = useMemo(() => {
+    return generateMonthDays(currentYear, currentMonth);
+  }, [currentYear, currentMonth]);
   const currentDayOfWeek = getDayOfWeekFromDate(activeDate);
+
+  // Filtrar areas dinamicamente: Solo mostrar areas que tengan al menos una persona asignada
+  const visibleAreas = areas.filter(area => persons.some(p => p.area === area));
+  const activeAreasList = visibleAreas.length > 0 ? visibleAreas : areas;
 
   // Helper to get week dates (Monday to Sunday) containing a target date
   const getWeekDates = (dateStr: string): string[] => {
@@ -93,99 +129,157 @@ export default function App() {
     return weekDatesArray;
   };
 
-  // Navigations to previous and next days or weeks
+  // Navigations to previous and next days or weeks (dynamic with no calendar boundaries)
   const handlePrev = () => {
     if (viewMode === 'day') {
-      const currentIndex = monthDays.findIndex(day => day.dateString === activeDate);
-      if (currentIndex > 0) {
-        setActiveDate(monthDays[currentIndex - 1].dateString);
-      }
+      const d = new Date(activeDate + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setActiveDate(`${yyyy}-${mm}-${dd}`);
     } else {
-      const currentWeekMon = getWeekDates(activeDate)[0];
-      const monDate = new Date(currentWeekMon + 'T00:00:00');
-      monDate.setDate(monDate.getDate() - 7);
-      const yyyy = monDate.getFullYear();
-      const mm = String(monDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(monDate.getDate()).padStart(2, '0');
-      const targetDate = `${yyyy}-${mm}-${dd}`;
-      
-      if (monthDays.some(day => day.dateString === targetDate)) {
-        setActiveDate(targetDate);
-      } else {
-        const firstMon = '2026-05-04';
-        if (activeDate !== firstMon) {
-          setActiveDate(firstMon);
-        }
-      }
+      const d = new Date(activeDate + 'T00:00:00');
+      d.setDate(d.getDate() - 7);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setActiveDate(`${yyyy}-${mm}-${dd}`);
     }
   };
 
   const handleNext = () => {
     if (viewMode === 'day') {
-      const currentIndex = monthDays.findIndex(day => day.dateString === activeDate);
-      if (currentIndex >= 0 && currentIndex < monthDays.length - 1) {
-        setActiveDate(monthDays[currentIndex + 1].dateString);
-      }
+      const d = new Date(activeDate + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setActiveDate(`${yyyy}-${mm}-${dd}`);
     } else {
-      const currentWeekMon = getWeekDates(activeDate)[0];
-      const monDate = new Date(currentWeekMon + 'T00:00:00');
-      monDate.setDate(monDate.getDate() + 7);
-      const yyyy = monDate.getFullYear();
-      const mm = String(monDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(monDate.getDate()).padStart(2, '0');
-      const targetDate = `${yyyy}-${mm}-${dd}`;
-      
-      if (monthDays.some(day => day.dateString === targetDate)) {
-        setActiveDate(targetDate);
-      } else {
-        const lastMon = '2026-05-25';
-        if (activeDate !== lastMon) {
-          setActiveDate(lastMon);
-        }
-      }
+      const d = new Date(activeDate + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setActiveDate(`${yyyy}-${mm}-${dd}`);
     }
   };
 
-  // 3. Load & Initialize LocalStorage
+  const handlePrevMonth = () => {
+    const d = new Date(activeDate + 'T00:00:00');
+    d.setMonth(d.getMonth() - 1);
+    d.setDate(1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setActiveDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const handleNextMonth = () => {
+    const d = new Date(activeDate + 'T00:00:00');
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setActiveDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  // 3. Load & Initialize API
   useEffect(() => {
-    const savedPersons = localStorage.getItem('cov_persons_v2');
-    const savedShifts = localStorage.getItem('cov_shifts_v2');
-    const savedTargets = localStorage.getItem('cov_targets_v2');
-    const savedAreas = localStorage.getItem('cov_areas_v2');
+    fetchDb().then((data) => {
+      setPersons(data.persons || []);
 
-    if (savedPersons && savedShifts && savedTargets) {
-      setPersons(JSON.parse(savedPersons));
-      setShifts(JSON.parse(savedShifts));
-      setTargets(JSON.parse(savedTargets));
-    } else {
-      // Seed initial defaults
-      setPersons(SEEDED_PERSONS);
-      setShifts(INITIAL_SHIFTS);
-      setTargets(DEFAULT_TARGETS);
+      // MIGRATION: Convert old dayOfWeek to date based on activeDate week
+      let loadedShifts = data.shifts || [];
+      let needsMigration = false;
+      loadedShifts = loadedShifts.map((s: any) => {
+        if (s.dayOfWeek !== undefined && !s.date) {
+          needsMigration = true;
+          const baseDates = [
+            '2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21',
+            '2026-05-22', '2026-05-23', '2026-05-24'
+          ];
+          const newDate = baseDates[s.dayOfWeek - 1] || '2026-05-18';
+          const { dayOfWeek, ...rest } = s;
+          return { ...rest, date: newDate };
+        }
+        return s;
+      });
+      if (needsMigration) {
+        saveDb({ ...data, shifts: loadedShifts });
+      }
+      setShifts(loadedShifts);
       
-      localStorage.setItem('cov_persons_v2', JSON.stringify(SEEDED_PERSONS));
-      localStorage.setItem('cov_shifts_v2', JSON.stringify(INITIAL_SHIFTS));
-      localStorage.setItem('cov_targets_v2', JSON.stringify(DEFAULT_TARGETS));
-    }
+      setTargets(data.targets || []);
+      
+      if (!data.areas || data.areas.length === 0) {
+        // Mantenemos las áreas por defecto para que la app no se rompa al buscar una categoría, pero sin empleados.
+        const defaultAreas = ['Atención', 'Soporte', 'Ventas', 'Administración'];
+        setAreas(defaultAreas);
+        saveDb({ areas: defaultAreas });
+      } else {
+        setAreas(data.areas);
+      }
 
-    if (savedAreas) {
-      setAreas(JSON.parse(savedAreas));
-    } else {
-      const initialAreas = ['Atención', 'Soporte', 'Ventas', 'Administración'];
-      setAreas(initialAreas);
-      localStorage.setItem('cov_areas_v2', JSON.stringify(initialAreas));
-    }
+      setDemand(data.demand || []);
+      setAttendance(data.attendance || []);
+    });
   }, []);
 
   useEffect(() => {
     (window as any)._allShifts = shifts;
   }, [shifts]);
 
-  // 4. Save updates to LocalStorage
+  // Auto-scroll inside horizontal calendar days carousel to center active day button without vertical side-effects
+  useEffect(() => {
+    if (carouselRef.current) {
+      const activeEl = carouselRef.current.querySelector('[data-active="true"]') as HTMLElement;
+      if (activeEl) {
+        const timer = setTimeout(() => {
+          const container = carouselRef.current;
+          if (container) {
+            const activeRect = activeEl.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            // Calculate target scroll position to center active element horizontally
+            const activeCenter = activeRect.left + activeRect.width / 2;
+            const containerCenter = containerRect.left + containerRect.width / 2;
+            const targetScrollLeft = container.scrollLeft + (activeCenter - containerCenter);
+            
+            container.scrollTo({
+              left: targetScrollLeft,
+              behavior: 'smooth'
+            });
+          }
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeDate, viewMode, monthDays]);
+
+  // 4. Save updates to API
   const saveToLocalStorage = (newPersons: Person[], newShifts: Shift[], newTargets: TargetCoverage[]) => {
-    localStorage.setItem('cov_persons_v2', JSON.stringify(newPersons));
-    localStorage.setItem('cov_shifts_v2', JSON.stringify(newShifts));
-    localStorage.setItem('cov_targets_v2', JSON.stringify(newTargets));
+    saveDb({ persons: newPersons, shifts: newShifts, targets: newTargets });
+  };
+
+  const handleManualSave = async () => {
+    try {
+      await saveDb({
+        persons,
+        shifts,
+        targets,
+        areas,
+        demand,
+        attendance
+      });
+      setHasUnsavedChanges(false);
+      alert('¡Planificación guardada exitosamente en la base de datos de Neon Postgres!');
+    } catch (error) {
+      console.error('Failed manual save', error);
+      alert('Ocurrió un error al intentar guardar la planificación en la base de datos.');
+    }
   };
 
   // 5. Operations handlers
@@ -208,6 +302,7 @@ export default function App() {
     });
     setShifts(updated);
     saveToLocalStorage(persons, updated, targets);
+    setHasUnsavedChanges(true);
     return true;
   };
 
@@ -215,6 +310,7 @@ export default function App() {
     const filtered = shifts.filter((s) => s.id !== shiftId);
     setShifts(filtered);
     saveToLocalStorage(persons, filtered, targets);
+    setHasUnsavedChanges(true);
   };
 
   const handleAddShift = (newShiftData: Omit<Shift, 'id'>): boolean => {
@@ -222,7 +318,7 @@ export default function App() {
     const fullNewShift: Shift = {
       ...newShiftData,
       id: newId,
-      dayOfWeek: newShiftData.dayOfWeek || currentDayOfWeek
+      date: (newShiftData as any).date || activeDate
     };
 
     const overlap = getOverlappingShift(fullNewShift, shifts);
@@ -234,16 +330,140 @@ export default function App() {
     const updated = [...shifts, fullNewShift];
     setShifts(updated);
     saveToLocalStorage(persons, updated, targets);
+    setHasUnsavedChanges(true);
     return true;
   };
 
-  const handleSaveModalShift = (shiftObj: Shift | Omit<Shift, 'id'>) => {
+  const handleSaveModalShift = (
+    shiftObj: Shift | Omit<Shift, 'id'>, 
+    replicateDates?: string[],
+    replicateWeeks?: string[]
+  ) => {
+    let success = false;
+    let nextShiftsList = [...shifts];
+
     if ('id' in shiftObj) {
-      // Edit mode
-      handleUpdateShift(shiftObj.id, shiftObj);
+      // Edit mode: let's perform update in our local copy
+      const current = nextShiftsList.find(s => s.id === shiftObj.id);
+      if (!current) return;
+      const candidate: Shift = { ...current, ...shiftObj };
+      
+      // Check overlap excluding itself
+      const overlap = getOverlappingShift(candidate, nextShiftsList.filter(s => s.id !== shiftObj.id));
+      if (overlap) {
+        alert(`¡Error de superposición! No se puede guardar. Este integrante ya tiene asignado otro turno el mismo día en el rango de ${formatHour(overlap.startHour)} a ${formatHour(overlap.startHour + overlap.duration)}.`);
+        return;
+      }
+      nextShiftsList = nextShiftsList.map(s => s.id === shiftObj.id ? candidate : s);
+      success = true;
     } else {
       // Create mode
-      handleAddShift(shiftObj);
+      const newId = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      const fullNewShift: Shift = {
+        ...shiftObj,
+        id: newId,
+        date: (shiftObj as any).date || activeDate
+      } as Shift;
+      const overlap = getOverlappingShift(fullNewShift, nextShiftsList);
+      if (overlap) {
+        alert(`¡Error de superposición! No se puede guardar. Este integrante ya tiene asignado otro turno el mismo día en el rango de ${formatHour(overlap.startHour)} a ${formatHour(overlap.startHour + overlap.duration)}.`);
+        return;
+      }
+      nextShiftsList.push(fullNewShift);
+      success = true;
+    }
+
+    if (success) {
+      const newShiftsToInsert: Shift[] = [];
+      let overlapErrors = 0;
+
+      // Pattern of days to replicate: current selected date + any other days checked in same week
+      const daysPattern = [shiftObj.date, ...(replicateDates || [])];
+
+      // Get Monday of current week
+      const currentWeekDates = getWeekDates(shiftObj.date);
+      const currentWeekMonday = currentWeekDates[0];
+
+      // 1. Replicate to selected other weeks (Option b)
+      if (replicateWeeks && replicateWeeks.length > 0) {
+        replicateWeeks.forEach((targetMonday) => {
+          daysPattern.forEach((baseDate) => {
+            // Find offset of baseDate from currentWeekMonday
+            const baseDateObj = new Date(baseDate + 'T00:00:00');
+            const mondayObj = new Date(currentWeekMonday + 'T00:00:00');
+            const diffDays = Math.round((baseDateObj.getTime() - mondayObj.getTime()) / 86400000);
+
+            // Calculate target date
+            const targetDateObj = new Date(targetMonday + 'T00:00:00');
+            targetDateObj.setDate(targetDateObj.getDate() + diffDays);
+            const yyyy = targetDateObj.getFullYear();
+            const mm = String(targetDateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(targetDateObj.getDate()).padStart(2, '0');
+            const targetDateStr = `${yyyy}-${mm}-${dd}`;
+
+            // Make sure we are not duplicating the main saved date or same-week checked dates
+            if (targetDateStr !== shiftObj.date && !(replicateDates || []).includes(targetDateStr)) {
+              const candidateShift: Omit<Shift, 'id'> = {
+                personId: shiftObj.personId,
+                date: targetDateStr,
+                startHour: shiftObj.startHour,
+                duration: shiftObj.duration,
+                area: shiftObj.area
+              };
+
+              const fullShiftCandidate = {
+                ...candidateShift,
+                id: 's_temp_' + Math.random()
+              };
+
+              if (checkOverlap(fullShiftCandidate, [...nextShiftsList, ...newShiftsToInsert])) {
+                overlapErrors++;
+              } else {
+                newShiftsToInsert.push({
+                  ...candidateShift,
+                  id: 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6)
+                });
+              }
+            }
+          });
+        });
+      }
+
+      // 2. Replicate to selected other days of same week (Option a)
+      if (replicateDates && replicateDates.length > 0) {
+        replicateDates.forEach((rDate) => {
+          const candidateShift: Omit<Shift, 'id'> = {
+            personId: shiftObj.personId,
+            date: rDate,
+            startHour: shiftObj.startHour,
+            duration: shiftObj.duration,
+            area: shiftObj.area
+          };
+
+          const fullShiftCandidate = {
+            ...candidateShift,
+            id: 's_temp_' + Math.random()
+          };
+
+          if (checkOverlap(fullShiftCandidate, [...nextShiftsList, ...newShiftsToInsert])) {
+            overlapErrors++;
+          } else {
+            newShiftsToInsert.push({
+              ...candidateShift,
+              id: 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6)
+            });
+          }
+        });
+      }
+
+      const finalCombinedShifts = [...nextShiftsList, ...newShiftsToInsert];
+      setShifts(finalCombinedShifts);
+      saveToLocalStorage(persons, finalCombinedShifts, targets);
+      setHasUnsavedChanges(true);
+
+      if (overlapErrors > 0) {
+        alert(`Se guardó el turno y se replicó en los días/semanas libres, pero ${overlapErrors} días fueron omitidos por superposición con turnos existentes.`);
+      }
     }
   };
 
@@ -256,10 +476,32 @@ export default function App() {
     const updated = [...persons, newPerson];
     setPersons(updated);
     saveToLocalStorage(updated, shifts, targets);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeletePersons = (personIds: string[]) => {
+    const newPersons = persons.filter(p => !personIds.includes(p.id));
+    const newShifts = shifts.filter(s => !personIds.includes(s.personId));
+    
+    setPersons(newPersons);
+    setShifts(newShifts);
+    
+    if (selectedPersonFilterId && personIds.includes(selectedPersonFilterId)) {
+      setSelectedPersonFilterId(null);
+    }
+    
+    saveToLocalStorage(newPersons, newShifts, targets);
+    setHasUnsavedChanges(true);
   };
 
   const saveAreasToLocalStorage = (newAreas: Area[]) => {
-    localStorage.setItem('cov_areas_v2', JSON.stringify(newAreas));
+    saveDb({ areas: newAreas });
+  };
+  const saveDemandToDb = (newDemand: DemandRecord[]) => {
+    saveDb({ demand: newDemand });
+  };
+  const saveAttendanceToDb = (newAttendance: AttendanceRecord[]) => {
+    saveDb({ attendance: newAttendance });
   };
 
   const handleAddArea = (newAreaName: string): boolean => {
@@ -305,6 +547,7 @@ export default function App() {
     if (activeTab === oldAreaName) setActiveTab(trimmedNew);
 
     saveToLocalStorage(updatedPersons, updatedShifts, updatedTargets);
+    setHasUnsavedChanges(true);
     return true;
   };
 
@@ -352,6 +595,7 @@ export default function App() {
     if (activeTab === areaToDelete) setActiveTab('Todos');
 
     saveToLocalStorage(updatedPersons, updatedShifts, updatedTargets);
+    setHasUnsavedChanges(true);
     return true;
   };
 
@@ -384,9 +628,42 @@ export default function App() {
 
     setShifts(updated);
     saveToLocalStorage(persons, updated, targets);
+    setHasUnsavedChanges(true);
     
     // Switch visual focus to the day we dropped on so the user sees the output
     setActiveDate(targetDate);
+  };
+
+  const handleSavePerson = (updatedPerson: Person) => {
+    const updated = persons.map(p => p.id === updatedPerson.id ? updatedPerson : p);
+    setPersons(updated);
+    
+    saveDb({
+      persons: updated,
+      shifts,
+      targets,
+      areas,
+      demand,
+      attendance
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeletePersonFromDb = (personId: string) => {
+    const updatedPersons = persons.filter(p => p.id !== personId);
+    const updatedShifts = shifts.filter(s => s.personId !== personId);
+    setPersons(updatedPersons);
+    setShifts(updatedShifts);
+
+    saveDb({
+      persons: updatedPersons,
+      shifts: updatedShifts,
+      targets,
+      areas,
+      demand,
+      attendance
+    });
+    setHasUnsavedChanges(true);
   };
 
   // Quick insertion when clicking plus on sidebar
@@ -412,28 +689,28 @@ export default function App() {
 
     handleAddShift({
       personId,
-      dayOfWeek: currentDayOfWeek,
+      date: activeDate,
       startHour: bestStartHour,
       duration: finalDuration,
       area: person.area
     });
   };
 
-  const handleUpdateTargets = (newHourlyTargets: number[]) => {
+  const handleUpdateTargets = (newHourlyTargets: number[], areaToUpdate: Area = activeArea) => {
     const updated = targets.map((t) => {
       // Update targets matching both selected area AND day of week
-      if (t.area === activeArea) {
+      if (t.area === areaToUpdate) {
         return { ...t, hourlyTargets: newHourlyTargets };
       }
       return t;
     });
 
     // If target doesn't exist for this combination yet, declare it
-    const exists = targets.some(t => t.area === activeArea);
+    const exists = targets.some(t => t.area === areaToUpdate);
     let finalTargets = updated;
     if (!exists) {
       const newTargetObj: TargetCoverage = {
-        area: activeArea,
+        area: areaToUpdate,
         dayOfWeek: currentDayOfWeek,
         hourlyTargets: newHourlyTargets
       };
@@ -442,6 +719,7 @@ export default function App() {
 
     setTargets(finalTargets);
     saveToLocalStorage(persons, shifts, finalTargets);
+    setHasUnsavedChanges(true);
   };
 
   // 6. Reset to Factory seeds
@@ -454,8 +732,13 @@ export default function App() {
       setAreas(defaultAreas);
       setActiveArea('Atención');
       setActiveTab('Todos');
-      saveToLocalStorage(SEEDED_PERSONS, INITIAL_SHIFTS, DEFAULT_TARGETS);
-      localStorage.setItem('cov_areas_v2', JSON.stringify(defaultAreas));
+      saveDb({
+        persons: SEEDED_PERSONS,
+        shifts: INITIAL_SHIFTS,
+        targets: DEFAULT_TARGETS,
+        areas: defaultAreas
+      });
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -463,11 +746,11 @@ export default function App() {
   const handleAutoBalanceCoverage = () => {
     // Look at current day & active department. Count deficits.
     const deptTargets = targets.find(t => t.area === activeArea)?.hourlyTargets || Array(24).fill(0);
-    const deptShiftsToday = shifts.filter(s => s.dayOfWeek === currentDayOfWeek && s.area === activeArea);
+    const deptShiftsToday = shifts.filter(s => s.date === activeDate && s.area === activeArea);
     const currentCoverage = calculateCoverage(deptShiftsToday, activeArea);
 
     // Identify people in this area with 0 hours scheduled today
-    const idlePeople = persons.filter(p => p.area === activeArea && !shifts.some(s => s.dayOfWeek === currentDayOfWeek && s.personId === p.id));
+    const idlePeople = persons.filter(p => p.area === activeArea && !shifts.some(s => s.date === activeDate && s.personId === p.id));
 
     if (idlePeople.length === 0) {
       alert(`No quedan recursos inactivos disponibles de ${activeArea} para auto-asignar hoy. Agrega nuevo personal o libera turnos.`);
@@ -491,7 +774,7 @@ export default function App() {
           addedShifts.push({
             id: 's_auto_' + Date.now() + '_' + addedCount,
             personId: person.id,
-            dayOfWeek: currentDayOfWeek,
+            date: activeDate,
             startHour: shiftStart,
             duration: shiftDuration,
             area: activeArea
@@ -505,9 +788,46 @@ export default function App() {
       const nextShifts = [...shifts, ...addedShifts];
       setShifts(nextShifts);
       saveToLocalStorage(persons, nextShifts, targets);
+      setHasUnsavedChanges(true);
       alert(`¡Optimización Exitosa! Se asignaron automáticamente ${addedCount} personas inactivas para cubrir picos deficientes.`);
     } else {
       alert(`La cobertura actual para ${activeArea} ya cumple con todos los objetivos o no se detectaron brechas críticas.`);
+    }
+  };
+
+  const handleCopyWeek = () => {
+    const currentWeekDates = getWeekDates(activeDate);
+    const currentWeekShifts = shifts.filter(s => currentWeekDates.includes(s.date));
+    
+    if (currentWeekShifts.length === 0) {
+      alert('No hay turnos programados en la semana actual para copiar.');
+      return;
+    }
+
+    const monDate = new Date(activeDate + 'T00:00:00');
+    monDate.setDate(monDate.getDate() + 7);
+    const yyyy = monDate.getFullYear();
+    const mm = String(monDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(monDate.getDate()).padStart(2, '0');
+    const nextWeekActiveDate = `${yyyy}-${mm}-${dd}`;
+    const nextWeekDates = getWeekDates(nextWeekActiveDate);
+
+    const newShifts = currentWeekShifts.map(s => {
+      const idx = currentWeekDates.indexOf(s.date);
+      const newDate = nextWeekDates[idx] || nextWeekDates[0];
+      return {
+        ...s,
+        id: `s_copy_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        date: newDate
+      };
+    });
+
+    if (window.confirm(`¿Copiar ${newShifts.length} turnos a la semana del ${nextWeekDates[0]}?`)) {
+      const combined = [...shifts, ...newShifts];
+      setShifts(combined);
+      saveToLocalStorage(persons, combined, targets);
+      setHasUnsavedChanges(true);
+      alert('¡Semana copiada con éxito! Navega a la próxima semana para ver los cambios.');
     }
   };
 
@@ -518,8 +838,14 @@ export default function App() {
     hourlyTargets: [0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 6, 6, 4, 4, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0] // fallbacks
   };
 
-  // 8. Filter overall shifts representing just the currently active Day of Week
-  const activeDayOfWeekShifts = shifts.filter((s) => s.dayOfWeek === currentDayOfWeek);
+  const admisionTargetsObj = targets.find(t => t.area === 'Admision') || {
+    area: 'Admision' as Area,
+    dayOfWeek: currentDayOfWeek,
+    hourlyTargets: [0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 6, 6, 4, 4, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0]
+  };
+
+  // 8. Filter overall shifts representing just the currently active Date
+  const activeDayOfWeekShifts = shifts.filter((s) => s.date === activeDate);
 
   return (
     <div className={`min-h-screen ${activeTheme.bg} transition-colors duration-300 font-sans flex flex-col antialiased`}>
@@ -535,13 +861,51 @@ export default function App() {
               Planificador de Cobertura de Turnos
             </h1>
             <p className={`text-[11px] ${activeTheme.headerSubtext}`}>
-              Panel interactivo de planificación | Mayo 2026 • 43 Colaboradores
+              Panel interactivo de planificación | {activeMonthName} {currentYear} • {persons.length} Colaboradores
             </p>
           </div>
         </div>
 
         {/* Global actions: Auto balance and Reset */}
         <div className="flex items-center gap-2">
+          {hasUnsavedChanges ? (
+            <button
+              onClick={handleManualSave}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse"
+              title="Guardar cambios pendientes en la base de datos de Neon Postgres"
+            >
+              <Save size={14} className="text-white" />
+              <span>Guardar Planificación</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleManualSave}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs"
+              title="Planificación guardada y sincronizada"
+            >
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              <span>Sincronizado</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsAttendanceModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+            title="Registrar Presentismo"
+          >
+            <CheckCircle2 size={14} className="text-blue-100" />
+            Presentismo
+          </button>
+
+          <button
+            onClick={() => setIsDemandModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+            title="Calculadora de Demanda"
+          >
+            <Clock size={14} className="text-orange-100" />
+            Demanda
+          </button>
+
           <button
             onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
@@ -558,6 +922,16 @@ export default function App() {
           >
             <Sparkles size={14} className="text-indigo-200 animate-pulse" />
             Auto-Asignar Brechas ({activeArea})
+          </button>
+          
+          <button
+            onClick={handleCopyWeek}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+            title="Copiar toda la programación de esta semana a la siguiente"
+          >
+            {/* Si no tenemos icono Copy, usamos RefreshCw temporalmente o Plus */}
+            <span className="font-bold">+</span>
+            Copiar Semana
           </button>
           
           <button
@@ -579,7 +953,7 @@ export default function App() {
       {/* 2. Interactive Month Date Navigator bar */}
       <div className={`${activeTheme.cardBg} ${activeTheme.cardBorder} border-b py-3 px-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 transition-colors duration-300`}>
         <div className="flex flex-wrap items-center gap-4">
-          {/* Day / Week View Switcher */}
+          {/* Day / Week / Analysis View Switcher */}
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-xs">
             <button
               onClick={() => setViewMode('day')}
@@ -605,46 +979,98 @@ export default function App() {
             >
               Semana Completa
             </button>
+            <button
+              onClick={() => setViewMode('analysis')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                viewMode === 'analysis'
+                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Análisis de Turnera
+            </button>
           </div>
 
-          <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
-            <button
+          {viewMode !== 'analysis' && (
+            <>
+              <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
+                <button
               onClick={handlePrev}
-              disabled={
-                viewMode === 'day'
-                  ? monthDays.findIndex(day => day.dateString === activeDate) === 0
-                  : getWeekDates(activeDate)[0] === '2026-05-04'
-              }
-              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-600 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1 text-xs font-semibold"
+              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title={viewMode === 'day' ? "Día Anterior" : "Semana Anterior"}
             >
               <ChevronLeft size={16} />
-              <span>Anterior</span>
+              <span>{viewMode === 'day' ? 'Día' : 'Semana'} Ant.</span>
             </button>
-            <span className="text-xs font-bold text-slate-700 uppercase font-mono px-3 select-none">
-              {viewMode === 'day' ? 'Mayo 2026' : `Semana del ${getWeekDates(activeDate)[0].split('-')[2]} al ${getWeekDates(activeDate)[6].split('-')[2]} de Mayo 2026`}
+            <span className="text-xs font-bold text-slate-600 font-sans px-2 select-none">
+              {viewMode === 'day' ? 'Navegación Diaria' : 'Navegación Semanal'}
             </span>
             <button
               onClick={handleNext}
-              disabled={
-                viewMode === 'day'
-                  ? monthDays.findIndex(day => day.dateString === activeDate) === monthDays.length - 1
-                  : getWeekDates(activeDate)[0] === '2026-05-25'
-              }
-              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-600 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1 text-xs font-semibold"
+              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title={viewMode === 'day' ? "Día Siguiente" : "Semana Siguiente"}
             >
-              <span>Siguiente</span>
+              <span>{viewMode === 'day' ? 'Día' : 'Semana'} Sig.</span>
               <ChevronRight size={16} />
             </button>
           </div>
-          <span className="text-xs text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-3 py-1 rounded-lg hidden xl:inline font-medium animate-pulse">
+
+          {/* Selector y Navegador de Mes Completo */}
+          <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-1 px-2 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
+              title="Mes Anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            
+            <select
+              value={`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                const [yearStr, monthStr] = e.target.value.split('-');
+                const y = parseInt(yearStr, 10);
+                const m = parseInt(monthStr, 10) - 1;
+                const d = new Date(Date.UTC(y, m, 1));
+                const yyyy = d.getUTCFullYear();
+                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(d.getUTCDate()).padStart(2, '0');
+                setActiveDate(`${yyyy}-${mm}-${dd}`);
+              }}
+              className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/50 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans cursor-pointer mx-1.5"
+            >
+              {Array.from({ length: 12 }, (_, i) => {
+                const monthNames = [
+                  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+                ];
+                const monthVal = String(i + 1).padStart(2, '0');
+                return (
+                  <option key={i} value={`${currentYear}-${monthVal}`}>
+                    {monthNames[i]} {currentYear}
+                  </option>
+                );
+              })}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1 px-2 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
+              title="Mes Siguiente"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>          <span className="text-xs text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-3 py-1 rounded-lg hidden xl:inline font-medium animate-pulse">
             💡 ¡Nuevo! Arrastra un turno y suéltalo en cualquier día del calendario para cambiar su día de asignación.
           </span>
+            </>
+          )}
         </div>
-
         {/* Calendar Days Horizon Carousel */}
-        <div className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar px-1">
+        {viewMode !== 'analysis' && (
+          <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar px-1">
           {monthDays.map((day: CalendarDay) => {
             const isSelected = viewMode === 'day'
               ? activeDate === day.dateString
@@ -653,12 +1079,21 @@ export default function App() {
             const isWeekFirstDay = viewMode === 'week' && day.dateString === getWeekDates(activeDate)[0];
             const isDraggedOver = draggedOverDate === day.dateString;
             
+            const isHoliday = !!FERIADOS_2026[day.dateString];
+
             let buttonStyles = "bg-slate-50 border-slate-200/60 text-slate-650 hover:bg-slate-200 hover:border-slate-300";
+            if (isHoliday && !isSelected && !isDraggedOver) {
+              buttonStyles = "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400";
+            }
             if (isSelected) {
               if (viewMode === 'day' || isWeekFirstDay) {
-                buttonStyles = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/80 -translate-y-0.5";
+                buttonStyles = isHoliday
+                  ? "bg-indigo-600 border-amber-400 text-white shadow-md ring-2 ring-amber-300/70 ring-offset-1 -translate-y-0.5 font-bold"
+                  : "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/80 -translate-y-0.5";
               } else {
-                buttonStyles = "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs -translate-y-px font-semibold";
+                buttonStyles = isHoliday
+                  ? "bg-amber-50 border-amber-300 text-indigo-700 shadow-sm -translate-y-px font-bold ring-1 ring-amber-300"
+                  : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs -translate-y-px font-semibold";
               }
             }
             if (isDraggedOver) {
@@ -668,6 +1103,7 @@ export default function App() {
             return (
               <button
                 key={day.dateString}
+                data-active={isSelected}
                 onClick={() => {
                   if (viewMode === 'day') {
                     setActiveDate(day.dateString);
@@ -688,13 +1124,15 @@ export default function App() {
                   }
                 }}
                 onDrop={(e) => handleDropShiftOnDate(e, day.dateString)}
+                title={FERIADOS_2026[day.dateString] ? `🎉 Feriado: ${FERIADOS_2026[day.dateString]}` : undefined}
                 className={`flex flex-col items-center p-2 rounded-xl text-center min-w-[54px] border transition-all cursor-pointer ${buttonStyles}`}
               >
                 <span className={`text-[10px] font-bold ${
                   (viewMode === 'day' && isSelected) || isDraggedOver || isWeekFirstDay
                     ? 'text-indigo-150' 
-                    : isSelected 
-                    ? 'text-indigo-400' 
+                    : isSelected                     ? 'text-indigo-400' 
+                    : isHoliday
+                    ? 'text-amber-500'
                     : 'text-slate-400'
                 }`}>
                   {day.label}
@@ -702,19 +1140,48 @@ export default function App() {
                 <span className="text-base font-extrabold tracking-tight font-sans">
                   {day.dayNum}
                 </span>
+                {isHoliday && (
+                  <span className={`text-[8px] leading-tight font-bold mt-0.5 ${
+                    ((viewMode === 'day' && isSelected) || isWeekFirstDay) ? 'text-amber-300' : 'text-amber-500'
+                  }`}>🎉</span>
+                )}
               </button>
             );
           })}
         </div>
+        )}
       </div>
 
       {/* 3. Main Operational Panels Container */}
       <div className="flex-1 flex flex-col lg:flex-row p-6 gap-6 overflow-hidden min-h-0">
-        
-        {/* Left column: People sidebar (Manage resources) */}
-        <div className="w-full lg:w-[320px] h-[580px] lg:h-auto shrink-0 flex flex-col">
-          <PeopleSidebar
-            persons={persons}
+        {viewMode === 'analysis' ? (
+          <div className="flex-1 h-full w-full bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col animate-fade-in">
+            <div className="bg-slate-50 border-b border-slate-200/80 px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-pulse" />
+                <span className="text-xs font-bold text-slate-700 font-sans">Reporte Estadístico e Histórico Consolidador</span>
+              </div>
+              <a 
+                href="/analisis_turnos.html" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+              >
+                <span>Abrir en pestaña nueva ↗</span>
+              </a>
+            </div>
+            <iframe 
+              src="/analisis_turnos.html" 
+              className="flex-1 w-full h-full border-0" 
+              title="Análisis de Turnos"
+            />
+          </div>
+        ) : (
+          <>
+            {/* Left column: People sidebar (Manage resources) */}
+            <div className="w-full lg:w-[320px] h-[580px] lg:h-auto shrink-0 flex flex-col">
+              <PeopleSidebar
+                persons={persons}
             shifts={shifts}
             selectedDate={activeDate}
             selectedArea={activeArea}
@@ -729,11 +1196,11 @@ export default function App() {
             }}
             activeFilterPersonId={selectedPersonFilterId}
             onEditPerson={(person) => {
-              setPreselectedPersonId(person.id);
-              setModalShift(null);
-              setIsModalOpen(true);
+              setEditingPerson(person);
+              setIsPersonModalOpen(true);
             }}
-            areas={areas}
+            onDeletePersons={handleDeletePersons}
+            areas={activeAreasList}
             onAddArea={handleAddArea}
             onEditArea={handleEditArea}
             onDeleteArea={handleDeleteArea}
@@ -750,7 +1217,7 @@ export default function App() {
               <Layers size={15} className="text-slate-400" />
               <span className="text-xs font-bold text-slate-500 mr-2 uppercase">Filtrar Línea de Tiempo por:</span>
               <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/50">
-                {['Todos', ...areas].map((tab) => (
+                {['Todos', ...activeAreasList].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => {
@@ -782,7 +1249,7 @@ export default function App() {
                 }}
                 className="text-xs font-bold border border-slate-250 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                {areas.map((a) => (
+                {activeAreasList.map((a) => (
                   <option key={a} value={a}>
                     {a === 'Atención' ? 'Atención (Especial)' : a}
                   </option>
@@ -827,18 +1294,56 @@ export default function App() {
           {/* Bottom stats chart */}
           <div className="shrink-0">
             <CoverageChart
-              shifts={activeDayOfWeekShifts}
-              activeArea={activeArea}
-              targetCount={activeTargetsObj.hourlyTargets}
-              onUpdateTargets={handleUpdateTargets}
+              shifts={shifts}
+              activeArea="Admision"
+              targetCount={admisionTargetsObj.hourlyTargets}
+              demand={demand}
+              activeDate={activeDate}
+              onUpdateTargets={(newTargets) => handleUpdateTargets(newTargets, 'Admision')}
               theme={activeTheme}
+              currentDayOfWeek={currentDayOfWeek}
+              weekDates={getWeekDates(activeDate)}
+              onChangeDate={setActiveDate}
+              persons={persons}
+              onQuickImport={(importedPersons, importedShifts) => {
+                setPersons(importedPersons);
+                setShifts(importedShifts);
+                saveToLocalStorage(importedPersons, importedShifts, targets);
+                setHasUnsavedChanges(true);
+              }}
             />
           </div>
-
         </div>
+          </>
+        )}
       </div>
 
       {/* Modals & Popups */}
+      <DemandCalculatorModal
+        isOpen={isDemandModalOpen}
+        onClose={() => setIsDemandModalOpen(false)}
+        demand={demand}
+        activeDate={activeDate}
+        activeArea="Admision"
+        onSaveDemand={(newDemand) => {
+          setDemand(newDemand);
+          saveDemandToDb(newDemand);
+        }}
+      />
+
+      <AttendanceTrackerModal
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
+        activeDate={activeDate}
+        persons={persons}
+        shifts={shifts}
+        attendance={attendance}
+        onSaveAttendance={(newAttendance) => {
+          setAttendance(newAttendance);
+          saveAttendanceToDb(newAttendance);
+        }}
+      />
+
       <ShiftEditorModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -853,7 +1358,7 @@ export default function App() {
         preselectedPersonId={preselectedPersonId}
         onSave={handleSaveModalShift}
         onDelete={modalShift ? () => handleDeleteShift(modalShift.id) : undefined}
-        areas={areas}
+        areas={activeAreasList}
       />
 
       <ExcelImporterModal
@@ -861,12 +1366,39 @@ export default function App() {
         onClose={() => setIsImportModalOpen(false)}
         persons={persons}
         activeArea={activeArea}
+        weekDates={getWeekDates(activeDate)}
         onImportCompleted={(importedPersons, importedShifts) => {
           setPersons(importedPersons);
           setShifts(importedShifts);
-          saveToLocalStorage(importedPersons, importedShifts, targets);
+          
+          // Auto-discover areas
+          const newAreas = Array.from(new Set([
+             ...areas,
+             ...importedPersons.map(p => p.area)
+          ]));
+          setAreas(newAreas);
+
+          saveDb({
+            persons: importedPersons,
+            shifts: importedShifts,
+            targets: targets,
+            areas: newAreas
+          });
+          setHasUnsavedChanges(true);
           setIsImportModalOpen(false);
         }}
+      />
+
+      <PersonEditorModal
+        isOpen={isPersonModalOpen}
+        onClose={() => {
+          setIsPersonModalOpen(false);
+          setEditingPerson(null);
+        }}
+        person={editingPerson}
+        onSave={handleSavePerson}
+        onDelete={handleDeletePersonFromDb}
+        areas={activeAreasList}
       />
     </div>
   );

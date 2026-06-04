@@ -3,6 +3,7 @@ import { Person, Shift, Area } from '../types';
 import { formatHour, parseHour, checkOverlap, getOverlappingShift } from '../utils';
 import { X, Clock, Trash2, ShieldCheck, User, LayoutGrid } from 'lucide-react';
 import { DAYS_OF_WEEK, AREAS } from '../seedData';
+import { FERIADOS_2026 } from '../feriados';
 
 interface ShiftEditorModalProps {
   shift: Shift | null; // If null, we are in "Create Mode"
@@ -11,10 +12,39 @@ interface ShiftEditorModalProps {
   selectedDate: string;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (shift: Shift | Omit<Shift, 'id'>) => void;
+  onSave: (shift: Shift | Omit<Shift, 'id'>, replicateDates?: string[], replicateWeeks?: string[]) => void;
   onDelete?: (shiftId: string) => void;
   preselectedPersonId?: string; // Optional context
   areas?: Area[];
+}
+
+interface MonthWeek {
+  weekNum: number;
+  startOfWeekStr: string;
+  endOfWeekStr: string;
+  label: string;
+  isCurrentWeek: boolean;
+}
+
+function getWeekDatesForDate(dateStr: string): string[] {
+  if (!dateStr) return [];
+  const date = new Date(dateStr + 'T00:00:00');
+  const day = date.getDay(); // 0: Sunday, 1: Monday, ...
+  const diffToMonday = day === 0 ? -6 : 1 - day; // diff to Monday
+  
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  
+  const weekDatesArray: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    weekDatesArray.push(`${yyyy}-${mm}-${dd}`);
+  }
+  return weekDatesArray;
 }
 
 export function ShiftEditorModal({
@@ -30,32 +60,35 @@ export function ShiftEditorModal({
   areas = AREAS,
 }: ShiftEditorModalProps) {
   const [personId, setPersonId] = useState('');
-  const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [dateStr, setDateStr] = useState(selectedDate);
   const [startHourStr, setStartHourStr] = useState('08:00');
   const [duration, setDuration] = useState(8);
   const [area, setArea] = useState<Area>('Atención');
   const [errorWord, setErrorWord] = useState('');
+  const [selectedReplicationDates, setSelectedReplicationDates] = useState<string[]>([]);
+  const [selectedReplicationWeeks, setSelectedReplicationWeeks] = useState<string[]>([]);
 
 
   // Hydrate form when modal opens or active shift changes
   useEffect(() => {
     if (shift) {
       setPersonId(shift.personId);
-      setDayOfWeek(shift.dayOfWeek);
+      setDateStr((shift as any).date || selectedDate);
       setStartHourStr(formatHour(shift.startHour));
       setDuration(shift.duration);
       setArea(shift.area);
     } else {
-      // Default creation setups
       setPersonId(preselectedPersonId || persons[0]?.id || '');
-      setDayOfWeek(1);
+      setDateStr(selectedDate);
       setStartHourStr('08:00');
       setDuration(8);
       const preselectedPerson = persons.find(p => p.id === (preselectedPersonId || persons[0]?.id));
       setArea(preselectedPerson ? preselectedPerson.area : 'Atención');
     }
     setErrorWord('');
-  }, [shift, isOpen, preselectedPersonId, persons]);
+    setSelectedReplicationDates([]);
+    setSelectedReplicationWeeks([]);
+  }, [shift, isOpen, preselectedPersonId, persons, selectedDate]);
 
   if (!isOpen) return null;
 
@@ -73,20 +106,20 @@ export function ShiftEditorModal({
     e.preventDefault();
     const parsedStart = parseHour(startHourStr);
 
-    if (parsedStart + duration > 24) {
-      setErrorWord('El turno supera las 24:00 horas del día. Por favor acorta la duración o adelanta la hora de inicio.');
+    if (duration > 24) {
+      setErrorWord('La duración de un turno individual no puede exceder las 24 horas.');
       return;
     }
 
     const candidate = {
       id: shift?.id,
       personId,
-      dayOfWeek,
+      date: dateStr,
       startHour: parsedStart,
       duration,
     };
 
-    const overlap = getOverlappingShift(candidate, shifts);
+    const overlap = getOverlappingShift(candidate as any, shifts);
     if (overlap) {
       setErrorWord(`¡Error de superposición! Esta persona ya tiene asignado otro turno el mismo día en el rango de ${formatHour(overlap.startHour)} a ${formatHour(overlap.startHour + overlap.duration)}.`);
       return;
@@ -97,20 +130,20 @@ export function ShiftEditorModal({
       onSave({
         ...shift,
         personId,
-        dayOfWeek,
+        date: dateStr,
         startHour: parsedStart,
         duration,
         area,
-      });
+      } as any, selectedReplicationDates, selectedReplicationWeeks);
     } else {
       // Create mode
       onSave({
         personId,
-        dayOfWeek,
+        date: dateStr,
         startHour: parsedStart,
         duration,
         area,
-      });
+      } as any, selectedReplicationDates, selectedReplicationWeeks);
     }
     onClose();
   };
@@ -146,6 +179,16 @@ export function ShiftEditorModal({
             </div>
           )}
 
+          {FERIADOS_2026[dateStr] && (
+            <div className="bg-amber-50/60 border border-amber-250 text-amber-900 rounded-lg p-3 font-medium flex items-center gap-2.5 animate-fade-in shadow-2xs">
+              <span className="text-base select-none">🎉</span>
+              <div>
+                <p className="text-[10px] text-amber-700 uppercase tracking-wider font-extrabold">Feriado Nacional</p>
+                <p className="text-xs font-semibold">{FERIADOS_2026[dateStr]}</p>
+              </div>
+            </div>
+          )}
+
           {/* Person Selector */}
           <div>
             <label className="block text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
@@ -165,21 +208,48 @@ export function ShiftEditorModal({
             </select>
           </div>
 
+          {/* Posibles Turnos (Si los tiene) */}
+          {(() => {
+            const selectedPerson = persons.find(p => p.id === personId);
+            if (selectedPerson && selectedPerson.possibleShifts && selectedPerson.possibleShifts.length > 0) {
+              return (
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 mt-3 animate-fade-in">
+                  <label className="block text-indigo-800 text-[10px] uppercase font-bold tracking-wider mb-2">
+                    Turnos Posibles (Plantillas):
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPerson.possibleShifts.map((ps, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setStartHourStr(formatHour(ps.startHour));
+                          setDuration(ps.duration);
+                        }}
+                        className="px-2.5 py-1.5 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors text-xs rounded-md shadow-sm font-semibold cursor-pointer active:scale-95 flex items-center gap-1.5"
+                      >
+                        <Clock size={12} />
+                        {formatHour(ps.startHour)} a {formatHour(ps.startHour + ps.duration)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <div className="grid grid-cols-2 gap-4">
-            {/* Day of the week */}
+            {/* Date */}
             <div>
-              <label className="block text-slate-500 font-semibold mb-1">Día de la Semana</label>
-              <select
-                value={dayOfWeek}
-                onChange={(e) => setDayOfWeek(Number(e.target.value))}
-                className="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                {DAYS_OF_WEEK.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-slate-500 font-semibold mb-1">Fecha</label>
+              <input
+                type="date"
+                value={dateStr}
+                onChange={(e) => setDateStr(e.target.value)}
+                className="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-sm"
+                required
+              />
             </div>
 
             {/* Area Selector (can override default area) */}
@@ -237,6 +307,118 @@ export function ShiftEditorModal({
             <span className="font-mono font-bold text-slate-800">
               {startHourStr} a {formatHour(parseHour(startHourStr) + duration)} ({duration} hrs)
             </span>
+          </div>
+
+          {/* Replicar Turno */}
+          <div className="border-t border-slate-100 pt-3">
+            <label className="block text-slate-500 font-semibold mb-2">Replicar este turno en otros días de la semana:</label>
+            <div className="grid grid-cols-4 gap-2">
+              {getWeekDatesForDate(dateStr).map((wDate, idx) => {
+                if (wDate === dateStr) return null;
+                const daysOfWeekLabels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                const dayLabel = daysOfWeekLabels[idx];
+                const isChecked = selectedReplicationDates.includes(wDate);
+                
+                return (
+                  <label 
+                    key={wDate} 
+                    className={`flex items-center gap-1.5 p-1.5 border rounded-lg cursor-pointer transition-all select-none hover:bg-slate-50 ${
+                      isChecked ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedReplicationDates([...selectedReplicationDates, wDate]);
+                        } else {
+                          setSelectedReplicationDates(selectedReplicationDates.filter(d => d !== wDate));
+                        }
+                      }}
+                      className="accent-indigo-600 rounded w-3.5 h-3.5"
+                    />
+                    <span className="text-[10px] truncate">{dayLabel.substring(0, 3)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Replicar en otras Semanas del mismo mes */}
+          <div className="border-t border-slate-100 pt-3 mt-3">
+            <label className="block text-slate-500 font-semibold mb-2">Replicar en otras semanas del mismo mes:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(() => {
+                if (!dateStr) return null;
+                const d = new Date(dateStr + 'T00:00:00');
+                const year = d.getFullYear();
+                const month = d.getMonth();
+                
+                const weeksList: MonthWeek[] = [];
+                const firstOfMonth = new Date(Date.UTC(year, month, 1));
+                let start = new Date(firstOfMonth);
+                const day = start.getUTCDay();
+                const diffToMonday = day === 0 ? -6 : 1 - day;
+                start.setUTCDate(start.getUTCDate() + diffToMonday);
+                
+                let weekIndex = 1;
+                while (start.getUTCMonth() === month || (start.getUTCMonth() === (month - 1 + 12) % 12 && start.getUTCDate() + 6 >= 1 && start.getUTCMonth() === month) || (weekIndex <= 5 && start.getUTCFullYear() === year)) {
+                  if (weekIndex > 5) break;
+                  
+                  const startMondayStr = start.toISOString().split('T')[0];
+                  
+                  const startStr = `${String(start.getUTCDate()).padStart(2, '0')}/${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
+                  const end = new Date(start);
+                  end.setUTCDate(start.getUTCDate() + 6);
+                  const endStr = `${String(end.getUTCDate()).padStart(2, '0')}/${String(end.getUTCMonth() + 1).padStart(2, '0')}`;
+                  
+                  const label = `Semana ${weekIndex} (${startStr} - ${endStr})`;
+                  const isCurrentWeek = getWeekDatesForDate(dateStr)[0] === startMondayStr;
+                  
+                  weeksList.push({
+                    weekNum: weekIndex,
+                    startOfWeekStr: startMondayStr,
+                    endOfWeekStr: end.toISOString().split('T')[0],
+                    label,
+                    isCurrentWeek
+                  });
+                  
+                  start.setUTCDate(start.getUTCDate() + 7);
+                  weekIndex++;
+                }
+                
+                return weeksList.map((wk) => {
+                  const isChecked = selectedReplicationWeeks.includes(wk.startOfWeekStr);
+                  
+                  return (
+                    <label 
+                      key={wk.startOfWeekStr} 
+                      className={`flex items-center gap-1.5 p-1.5 border rounded-lg cursor-pointer transition-all select-none hover:bg-slate-50 ${
+                        wk.isCurrentWeek ? 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60' :
+                        isChecked ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={wk.isCurrentWeek ? true : isChecked}
+                        disabled={wk.isCurrentWeek}
+                        onChange={(e) => {
+                          if (wk.isCurrentWeek) return;
+                          if (e.target.checked) {
+                            setSelectedReplicationWeeks([...selectedReplicationWeeks, wk.startOfWeekStr]);
+                          } else {
+                            setSelectedReplicationWeeks(selectedReplicationWeeks.filter(w => w !== wk.startOfWeekStr));
+                          }
+                        }}
+                        className="accent-indigo-600 rounded w-3.5 h-3.5"
+                      />
+                      <span className="text-[10px] truncate">{wk.label}</span>
+                    </label>
+                  );
+                });
+              })()}
+            </div>
           </div>
 
           {/* Action buttons */}

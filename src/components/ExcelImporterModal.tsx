@@ -30,6 +30,7 @@ interface ExcelImporterModalProps {
   persons: Person[];
   onImportCompleted: (importedPersons: Person[], importedShifts: Shift[]) => void;
   activeArea: Area;
+  weekDates: string[]; // <-- new prop
 }
 
 interface ParsedTemplateRow {
@@ -56,7 +57,8 @@ export function ExcelImporterModal({
   onClose,
   persons,
   onImportCompleted,
-  activeArea
+  activeArea,
+  weekDates
 }: ExcelImporterModalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedTemplateRow[]>([]);
@@ -107,6 +109,15 @@ export function ExcelImporterModal({
     }
     
     const str = String(val).trim();
+    // Excel decimal fix
+    const valNum2 = parseFloat(str);
+    if (!isNaN(valNum2) && valNum2 > 0 && valNum2 < 1) {
+      const totalSeconds = Math.round(valNum2 * 24 * 3600);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+
     const regex = /^(\d{1,2}):(\d{1,2})(:(\d{1,2}))?/;
     const match = str.match(regex);
     if (match) {
@@ -148,13 +159,15 @@ export function ExcelImporterModal({
 
   const parseAreaString = (areaStr: any): Area | null => {
     if (!areaStr) return null;
-    const norm = String(areaStr).trim().toUpperCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const raw = String(areaStr).trim();
+    if (!raw) return null;
+    const norm = raw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (PARSED_AREAS_MAP[norm]) return PARSED_AREAS_MAP[norm];
     for (const key of Object.keys(PARSED_AREAS_MAP)) {
       if (norm.includes(key)) return PARSED_AREAS_MAP[key];
     }
-    return null;
+    // Dynamic area parsing
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
   };
 
   // Convert files
@@ -176,7 +189,7 @@ export function ExcelImporterModal({
 
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: '' });
+        const rows = XLSX.utils.sheet_to_json<any>(sheet, { raw: false, defval: '' });
 
         if (rows.length === 0) {
           setErrorMessage('No se encontraron registros en la primera hoja de Excel.');
@@ -217,7 +230,7 @@ export function ExcelImporterModal({
           if (!rawName) warnings.push('Nombre ausente (se generó genérico).');
           if (!rawLegajo) warnings.push('Legajo ausente (se generó automático).');
           if (!timeIngreso || !timeSalida) warnings.push('Formato de hora de ingreso/salida inválido, se asumió 08:00 - 16:00.');
-          if (daysOfWeek.length === 0) warnings.push('Días no especificados o no coincide con LUNES a DOMINGO.');
+          // if (daysOfWeek.length === 0) warnings.push('Días no especificados o no coincide con LUNES a DOMINGO.'); // Removido para admitir Plantillas
           if (duration > 12) warnings.push('El turno supera las 12 horas diarias (Alerta de horas extra).');
 
           return {
@@ -276,10 +289,13 @@ export function ExcelImporterModal({
             if (targetPerson) {
               const pShifts = existingShifts.filter(s => s.personId === targetPerson.id);
               for (const s of pShifts) {
-                if (rowA.daysOfWeek.includes(s.dayOfWeek)) {
+                const shiftDayNum = new Date(s.date + 'T00:00:00').getDay() || 7; // Convert DB date to 1-7
+                // Actually it's better to map rowA's days to actual dates and compare
+                const rowDates = rowA.daysOfWeek.map(d => weekDates[d - 1]);
+                if (rowDates.includes(s.date)) {
                   const sEnd = s.startHour + s.duration;
                   if (startA < sEnd && s.startHour < endA) {
-                    rowA.warnings.push(`Superpone turno actual del sistema (${formatHour(s.startHour)}-${formatHour(sEnd)}).`);
+                    rowA.warnings.push(`Superpone turno actual del sistema el ${s.date} (${formatHour(s.startHour)}-${formatHour(sEnd)}).`);
                     break;
                   }
                 }
@@ -443,18 +459,30 @@ export function ExcelImporterModal({
       }
 
       // Add appropriate shifts for each mapped day of the week
-      row.daysOfWeek.forEach((dayNum) => {
-        const shiftId = `s_imp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        newShifts.push({
-          id: shiftId,
-          personId: targetPerson!.id,
-          dayOfWeek: dayNum,
-          startHour: row.startHour,
-          duration: row.duration,
-          area: row.assignedArea
+      const isPossibleShiftOnly = row.daysOfWeek.length === 0;
+      if (isPossibleShiftOnly) {
+        if (!targetPerson.possibleShifts) {
+          targetPerson.possibleShifts = [];
+        }
+        const exists = targetPerson.possibleShifts.some(ps => ps.startHour === row.startHour && ps.duration === row.duration);
+        if (!exists) {
+          targetPerson.possibleShifts.push({ startHour: row.startHour, duration: row.duration });
+        }
+      } else {
+        row.daysOfWeek.forEach((dayNum) => {
+          const shiftId = `s_imp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const dateStr = weekDates[dayNum - 1];
+          newShifts.push({
+            id: shiftId,
+            personId: targetPerson!.id,
+            date: dateStr,
+            startHour: row.startHour,
+            duration: row.duration,
+            area: row.assignedArea
+          });
+          addedShiftsCount++;
         });
-        addedShiftsCount++;
-      });
+      }
     });
 
     const finalShifts = cleanExistingShifts ? newShifts : [...onClearCompletedFilterShifts(), ...newShifts];
@@ -744,7 +772,7 @@ export function ExcelImporterModal({
                                   })}
                                 </div>
                               ) : (
-                                <span className="text-rose-500 font-bold">Sin días válidos (omitido)</span>
+                                <span className="text-emerald-500 font-bold bg-emerald-50 px-2 py-1 rounded">Plantilla Rotativa</span>
                               )}
                             </td>
                             <td className="p-2.5">

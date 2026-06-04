@@ -1,10 +1,13 @@
 import { Area, Shift, Person } from './types';
 
-// Converts a numeric hour (e.g., 8.5) to a string ("08:30")
 export function formatHour(hourNum: number): string {
-  const h = Math.floor(hourNum);
-  const m = Math.round((hourNum - h) * 60);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  const rounded = Math.round(hourNum * 100) / 100; // avoid floating point issues
+  const hRaw = Math.floor(rounded);
+  const m = Math.round((rounded - hRaw) * 60);
+  const h = hRaw % 24;
+  const daysLater = Math.floor(hRaw / 24);
+  const daySuffix = daysLater > 0 ? ` (+${daysLater}d)` : '';
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}${daySuffix}`;
 }
 
 // Converts a string ("08:30") to a numeric hour (8.5)
@@ -96,34 +99,50 @@ export function getInitials(name: string): string {
 }
 
 /**
- * Checks if a candidate shift overlaps with any existing shift for the same person on the same day.
+ * Checks if a candidate shift overlaps with any existing shift for the same person, including overnight shifts.
  */
 export function checkOverlap(
-  candidate: { id?: string; personId: string; dayOfWeek: number; startHour: number; duration: number },
+  candidate: { id?: string; personId: string; date: string; startHour: number; duration: number },
   allShifts: Shift[]
 ): boolean {
-  const candidateEnd = candidate.startHour + candidate.duration;
+  if (!candidate.date) return false;
+  const candidateDate = new Date(candidate.date + 'T00:00:00').getTime() / 3600000;
+  const candStart = candidateDate + candidate.startHour;
+  const candEnd = candStart + candidate.duration;
+
   return allShifts.some((s) => {
     if (candidate.id && s.id === candidate.id) return false;
-    if (s.personId !== candidate.personId || s.dayOfWeek !== candidate.dayOfWeek) return false;
-    const sEnd = s.startHour + s.duration;
-    return candidate.startHour < sEnd && s.startHour < candidateEnd;
+    if (s.personId !== candidate.personId) return false;
+    
+    const sDate = new Date(s.date + 'T00:00:00').getTime() / 3600000;
+    const sStart = sDate + s.startHour;
+    const sEnd = sStart + s.duration;
+
+    return candStart < sEnd && sStart < candEnd;
   });
 }
 
 /**
- * Returns the first overlapping shift if it exists, otherwise undefined.
+ * Returns the first overlapping shift if it exists, otherwise undefined, including overnight shifts.
  */
 export function getOverlappingShift(
-  candidate: { id?: string; personId: string; dayOfWeek: number; startHour: number; duration: number },
+  candidate: { id?: string; personId: string; date: string; startHour: number; duration: number },
   allShifts: Shift[]
 ): Shift | undefined {
-  const candidateEnd = candidate.startHour + candidate.duration;
+  if (!candidate.date) return undefined;
+  const candidateDate = new Date(candidate.date + 'T00:00:00').getTime() / 3600000;
+  const candStart = candidateDate + candidate.startHour;
+  const candEnd = candStart + candidate.duration;
+
   return allShifts.find((s) => {
     if (candidate.id && s.id === candidate.id) return false;
-    if (s.personId !== candidate.personId || s.dayOfWeek !== candidate.dayOfWeek) return false;
-    const sEnd = s.startHour + s.duration;
-    return candidate.startHour < sEnd && s.startHour < candidateEnd;
+    if (s.personId !== candidate.personId) return false;
+    
+    const sDate = new Date(s.date + 'T00:00:00').getTime() / 3600000;
+    const sStart = sDate + s.startHour;
+    const sEnd = sStart + s.duration;
+
+    return candStart < sEnd && sStart < candEnd;
   });
 }
 

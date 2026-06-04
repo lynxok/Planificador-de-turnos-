@@ -3,6 +3,7 @@ import { Person, Shift, Area } from '../types';
 import { formatHour, getHourRange, getDayOfWeekFromDate } from '../utils';
 import { Edit2, Trash2, Clock, AlertTriangle, ChevronLeft, ChevronRight, Plus, Eye, MonitorPlay, Search, X, User, Filter } from 'lucide-react';
 import { AppTheme } from '../themes';
+import { FERIADOS_2026 } from '../feriados';
 
 interface TimelineGridProps {
   persons: Person[];
@@ -35,8 +36,8 @@ export function TimelineGrid({
   weekDates = [],
   theme,
 }: TimelineGridProps) {
+  const [dragOverCell, setDragOverCell] = useState<{ personId: string; dateStr: string; hour: number } | null>(null);
   const [draggedShiftId, setDraggedShiftId] = useState<string | null>(null);
-  const [dragOverCell, setDragOverCell] = useState<{ personId: string; dayOfWeek: number; hour: number } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [onlyWithShifts, setOnlyWithShifts] = useState(false);
 
@@ -55,9 +56,9 @@ export function TimelineGrid({
 
     if (onlyWithShifts) {
       if (viewMode === 'day') {
-        return shifts.some((s) => s.personId === p.id && s.dayOfWeek === currentDayOfWeek);
+        return shifts.some((s) => s.personId === p.id && s.date === selectedDate);
       } else {
-        return shifts.some((s) => s.personId === p.id && s.dayOfWeek >= 1 && s.dayOfWeek <= 7);
+        return shifts.some((s) => s.personId === p.id && weekDates.includes(s.date));
       }
     }
 
@@ -80,7 +81,7 @@ export function TimelineGrid({
   if (viewMode === 'day') {
     activePersons.forEach((person) => {
       rows.push({
-        id: `${person.id}_${currentDayOfWeek}`,
+        id: `${person.id}_${selectedDate}`,
         person,
         dayOfWeek: currentDayOfWeek,
         dayLabel: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][currentDayOfWeek - 1],
@@ -92,7 +93,7 @@ export function TimelineGrid({
       for (let d = 1; d <= 7; d++) {
         const dateStr = weekDates[d - 1] || selectedDate;
         rows.push({
-          id: `${person.id}_${d}`,
+          id: `${person.id}_${dateStr}`,
           person,
           dayOfWeek: d,
           dayLabel: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][d - 1],
@@ -123,25 +124,23 @@ export function TimelineGrid({
   };
 
   // Drag Over timeline slot
-  const handleDragOverSlot = (e: React.DragEvent, personId: string, dayOfWeek: number, hour: number) => {
+  const handleDragOverSlot = (e: React.DragEvent, personId: string, dateStr: string, hour: number) => {
     e.preventDefault();
     if (!draggedShiftId) return;
-    setDragOverCell({ personId, dayOfWeek, hour });
+    setDragOverCell({ personId, dateStr, hour });
   };
 
-  // Drop shift into specific slot (handles moving in hours and reassignment between people & days!)
-  const handleDropSlot = (e: React.DragEvent, targetPersonId: string, targetDayOfWeek: number, targetHour: number) => {
+  // Drop shift into specific slot
+  const handleDropSlot = (e: React.DragEvent, targetPersonId: string, targetDateStr: string, targetHour: number) => {
     e.preventDefault();
     if (!draggedShiftId) return;
 
     const shift = shifts.find((s) => s.id === draggedShiftId);
     if (!shift) return;
 
-    // Find target person to match area or retain
     const targetPerson = persons.find((p) => p.id === targetPersonId);
     if (!targetPerson) return;
 
-    // Constrain hours so the shift doesn't exceed 24:00
     let adjustedStartHour = targetHour;
     if (adjustedStartHour + shift.duration > 24) {
       adjustedStartHour = 24 - shift.duration;
@@ -149,9 +148,9 @@ export function TimelineGrid({
 
     onUpdateShift(draggedShiftId, {
       personId: targetPersonId,
-      dayOfWeek: targetDayOfWeek,
+      date: targetDateStr,
       startHour: Math.max(0, adjustedStartHour),
-      area: targetPerson.area, // Update area alignment
+      area: targetPerson.area,
     });
 
     setDraggedShiftId(null);
@@ -159,14 +158,13 @@ export function TimelineGrid({
   };
 
   // Create a shift in that cell on double click
-  const handleCellDoubleClick = (personId: string, dayOfWeek: number, hour: number) => {
+  const handleCellDoubleClick = (personId: string, dateStr: string, hour: number) => {
     const person = persons.find((p) => p.id === personId);
     if (!person) return;
     
-    // Default shift of 8 hours starting at clicked hour
     onAddShift({
       personId,
-      dayOfWeek, // Correctly bound to visual day of week Context!
+      date: dateStr,
       startHour: hour,
       duration: Math.min(8, 24 - hour),
       area: person.area,
@@ -220,6 +218,12 @@ export function TimelineGrid({
               >
                 <X size={11} />
               </button>
+            </div>
+          )}
+
+          {viewMode === 'day' && FERIADOS_2026[selectedDate] && (
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200/60 text-amber-850 px-2.5 py-1 rounded-lg font-semibold text-[11px] animate-pulse shadow-sm">
+              <span>🎉 Feriado Nacional: <strong>{FERIADOS_2026[selectedDate]}</strong></span>
             </div>
           )}
         </div>
@@ -293,13 +297,24 @@ export function TimelineGrid({
               </div>
             ) : (
               rows.map((row) => {
-                // Determine shifts belonging to this person on this row's active dayOfWeek (can have multiple!)
-                const personShifts = activeShiftsQuery.filter(
-                  (s) => s.personId === row.person.id && s.dayOfWeek === row.dayOfWeek
+                const yesterdayDate = (() => {
+                  const d = new Date(row.dateStr + 'T00:00:00');
+                  d.setDate(d.getDate() - 1);
+                  const yyyy = d.getFullYear();
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  return `${yyyy}-${mm}-${dd}`;
+                })();
+
+                const todayShifts = activeShiftsQuery.filter(
+                  (s) => s.personId === row.person.id && s.date === row.dateStr
+                );
+
+                const yesterdayOverflowShifts = activeShiftsQuery.filter(
+                  (s) => s.personId === row.person.id && s.date === yesterdayDate && s.startHour + s.duration > 24
                 );
                 
-                // Keep track of total hours to flag overflow
-                const totalHours = personShifts.reduce((acc, shift) => acc + shift.duration, 0);
+                const totalHours = todayShifts.reduce((acc, shift) => acc + shift.duration, 0);
                 const isOverworked = totalHours > row.person.maxDailyHours;
 
                 return (
@@ -324,7 +339,16 @@ export function TimelineGrid({
                         {viewMode === 'day' ? (
                           <span className="font-semibold bg-slate-100 text-slate-600 px-1 rounded">{row.person.area}</span>
                         ) : (
-                          <span className="font-bold text-indigo-700 bg-indigo-50 px-1 rounded-sm uppercase tracking-wide text-[8px]">{row.dayLabel}</span>
+                          <span 
+                            title={FERIADOS_2026[row.dateStr] ? `🎉 Feriado Nacional: ${FERIADOS_2026[row.dateStr]}` : undefined}
+                            className={`font-bold px-1 rounded-sm uppercase tracking-wide text-[8px] flex items-center gap-0.5 border ${
+                              FERIADOS_2026[row.dateStr]
+                                ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs font-extrabold'
+                                : 'text-indigo-700 bg-indigo-50 border-transparent'
+                            }`}
+                          >
+                            {row.dayLabel} {FERIADOS_2026[row.dateStr] ? '🎉' : ''}
+                          </span>
                         )}
                         <span className="font-mono">{totalHours > 0 ? `${totalHours} hrs` : 'Sin turno'}</span>
                       </div>
@@ -335,13 +359,13 @@ export function TimelineGrid({
                       
                       {/* 24 hour slots for droppable coordinates */}
                       {hours.map((hour) => {
-                        const isOver = dragOverCell?.personId === row.person.id && dragOverCell?.dayOfWeek === row.dayOfWeek && dragOverCell?.hour === hour;
+                        const isOver = dragOverCell?.personId === row.person.id && dragOverCell?.dateStr === row.dateStr && dragOverCell?.hour === hour;
                         return (
                           <div
                             key={hour}
-                            onDragOver={(e) => handleDragOverSlot(e, row.person.id, row.dayOfWeek, hour)}
-                            onDrop={(e) => handleDropSlot(e, row.person.id, row.dayOfWeek, hour)}
-                            onDoubleClick={() => handleCellDoubleClick(row.person.id, row.dayOfWeek, hour)}
+                            onDragOver={(e) => handleDragOverSlot(e, row.person.id, row.dateStr, hour)}
+                            onDrop={(e) => handleDropSlot(e, row.person.id, row.dateStr, hour)}
+                            onDoubleClick={() => handleCellDoubleClick(row.person.id, row.dateStr, hour)}
                             className={`col-span-1 border-r ${theme.timelineCellBorder} h-full relative cursor-crosshair transition-all ${
                               isOver ? theme.timelineDragOverBg : ''
                             }`}
@@ -349,11 +373,12 @@ export function TimelineGrid({
                         );
                       })}
 
-                      {/* Render absolute floating shift bars belonging to this person */}
-                      {personShifts.map((shift) => {
-                        // Calculate percentage-based geometry
+                      {/* Render absolute floating shift bars starting today */}
+                      {todayShifts.map((shift) => {
+                        // Capping the visual end to 24 hours so it fits the grid row perfectly
+                        const displayDuration = Math.min(shift.duration, 24 - shift.startHour);
                         const startPct = (shift.startHour / 24) * 100;
-                        const widthPct = (shift.duration / 24) * 100;
+                        const widthPct = (displayDuration / 24) * 100;
 
                         // Identify color accents via theme
                         const palette = theme.areaColors?.[shift.area] || theme.areaColors?.['Atención'] || {
@@ -363,6 +388,8 @@ export function TimelineGrid({
                           handle: 'bg-indigo-300'
                         };
 
+                        const isOvernight = shift.startHour + shift.duration > 24;
+
                         return (
                           <div
                             key={shift.id}
@@ -370,7 +397,9 @@ export function TimelineGrid({
                             draggable
                             onDragStart={(e) => handleDragStart(e, shift.id)}
                             onDragEnd={() => handleDragEnd(shift.id)}
-                            className={`absolute top-2 bottom-2 rounded-lg shadow-sm font-sans flex flex-col justify-center px-2 py-1 select-none cursor-grab active:cursor-grabbing border transition-transform duration-100 group/shift hover:-translate-y-0.5 z-10 ${palette.bg}`}
+                            className={`absolute top-2 bottom-2 rounded-lg shadow-sm font-sans flex flex-col justify-center px-2 py-1 select-none cursor-grab active:cursor-grabbing border transition-transform duration-100 group/shift hover:-translate-y-0.5 z-10 ${palette.bg} ${
+                              isOvernight ? 'border-amber-400 ring-1 ring-amber-300/30' : ''
+                            }`}
                             style={{
                               left: `${startPct}%`,
                               width: `${widthPct}%`,
@@ -421,7 +450,7 @@ export function TimelineGrid({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const nextStart = Math.min(23.5, shift.startHour + 0.5);
-                                    if (nextStart + shift.duration <= 24) {
+                                    if (nextStart + shift.duration <= 48) { // allow shifting overnight shifts
                                       onUpdateShift(shift.id, { startHour: nextStart });
                                     }
                                   }}
@@ -432,8 +461,8 @@ export function TimelineGrid({
                                 </button>
                               </div>
 
-                              <span className={`${palette.text} font-medium tracking-tight text-[8px]`}>
-                                {shift.duration}h
+                              <span className={`${palette.text} font-medium tracking-tight text-[8px] flex items-center gap-0.5`}>
+                                {shift.duration}h {isOvernight && '🌙'}
                               </span>
 
                               {/* Duration expanding controls */}
@@ -452,7 +481,7 @@ export function TimelineGrid({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const nextDur = Math.min(24 - shift.startHour, shift.duration + 0.5);
+                                    const nextDur = Math.min(24, shift.duration + 0.5);
                                     onUpdateShift(shift.id, { duration: nextDur });
                                   }}
                                   className="text-[10px] bg-slate-900/30 hover:bg-slate-900/50 px-0.5 rounded cursor-pointer text-white"
@@ -461,6 +490,40 @@ export function TimelineGrid({
                                   +
                                 </button>
                               </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Render absolute floating shift bars starting yesterday that overflow into today */}
+                      {yesterdayOverflowShifts.map((shift) => {
+                        const displayDuration = shift.startHour + shift.duration - 24;
+                        const startPct = 0;
+                        const widthPct = (displayDuration / 24) * 100;
+
+                        // Identify color accents via theme
+                        const palette = theme.areaColors?.[shift.area] || theme.areaColors?.['Atención'] || {
+                          bg: 'bg-[#4f46e5]/80 text-white',
+                          ring: 'focus:ring-indigo-300 border-indigo-700',
+                          text: 'text-indigo-200',
+                          handle: 'bg-indigo-300'
+                        };
+
+                        return (
+                          <div
+                            key={`overflow-${shift.id}`}
+                            className={`absolute top-2.5 bottom-2.5 rounded-lg shadow-sm font-sans flex flex-col justify-center px-2 py-1 select-none border border-dashed border-indigo-400 bg-indigo-50/70 text-indigo-800 opacity-80 z-10`}
+                            style={{
+                              left: `${startPct}%`,
+                              width: `${widthPct}%`,
+                              minWidth: '40px'
+                            }}
+                            title={`Turno iniciado el día anterior: ${formatHour(shift.startHour)} a ${formatHour(shift.startHour + shift.duration)}`}
+                          >
+                            <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-bold">
+                              <span className="truncate flex items-center gap-0.5">
+                                🌙 (Cont.) 00:00 - {formatHour(shift.startHour + shift.duration)}
+                              </span>
                             </div>
                           </div>
                         );

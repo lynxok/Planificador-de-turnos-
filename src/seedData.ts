@@ -56,7 +56,7 @@ export const SEEDED_PERSONS: Person[] = [
   { id: 'p43', name: 'Félix Mercado', area: 'Administración', maxDailyHours: 8, availabilityStart: 8, availabilityEnd: 16, color: 'cyan' }
 ];
 
-export const INITIAL_SHIFTS: Shift[] = [
+export const INITIAL_SHIFTS: any[] = [
   // Monday Shifts (dayOfWeek: 1)
   { id: 's1', personId: 'p1', dayOfWeek: 1, startHour: 8, duration: 8, area: 'Atención' },
   { id: 's2', personId: 'p2', dayOfWeek: 1, startHour: 8, duration: 8, area: 'Atención' },

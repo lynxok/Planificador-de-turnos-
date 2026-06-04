@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Person, Shift, Area } from '../types';
 import { getInitials, formatHour } from '../utils';
-import { Search, Plus, Filter, Clock, UserCheck, UserPlus, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Filter, Clock, UserCheck, UserPlus, AlertCircle, Edit2, Trash2, CheckSquare } from 'lucide-react';
 import { AppTheme, THEMES } from '../themes';
 
 interface PeopleSidebarProps {
@@ -14,6 +14,7 @@ interface PeopleSidebarProps {
   onSelectPerson: (person: Person) => void;
   activeFilterPersonId?: string | null;
   onEditPerson?: (person: Person) => void;
+  onDeletePersons?: (personIds: string[]) => void;
   areas: Area[];
   onAddArea: (area: Area) => boolean;
   onEditArea: (oldArea: Area, newArea: Area) => boolean;
@@ -31,6 +32,7 @@ export function PeopleSidebar({
   onSelectPerson,
   activeFilterPersonId = null,
   onEditPerson,
+  onDeletePersons,
   areas,
   onAddArea,
   onEditArea,
@@ -40,6 +42,8 @@ export function PeopleSidebar({
   const [searchTerm, setSearchTerm] = useState('');
   const [areaFilter, setAreaFilter] = useState<Area | 'Todos'>(selectedArea);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedPersonIds, setSelectedPersonIds] = useState<Set<string>>(new Set());
   
   // States for area manager panel
   const [showAreaManager, setShowAreaManager] = useState(false);
@@ -75,7 +79,7 @@ export function PeopleSidebar({
 
   // Calculate allocated hours for each person on the selected day
   const getPersonScheduledHours = (personId: string) => {
-    const personShifts = shifts.filter((s) => s.personId === personId);
+    const personShifts = shifts.filter((s) => s.personId === personId && s.date === selectedDate);
     return personShifts.reduce((acc, shift) => acc + shift.duration, 0);
   };
 
@@ -113,14 +117,49 @@ export function PeopleSidebar({
               Personal ({persons.length})
             </h2>
           </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-lg cursor-pointer"
-          >
-            <Plus size={14} />
-            Nuevo
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                if (isSelectionMode) {
+                  setSelectedPersonIds(new Set());
+                }
+                setIsSelectionMode(!isSelectionMode);
+              }}
+              className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
+                isSelectionMode ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              <CheckSquare size={12} />
+              {isSelectionMode ? 'Cancelar' : 'Selección'}
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-lg cursor-pointer"
+            >
+              <Plus size={14} />
+              Nuevo
+            </button>
+          </div>
         </div>
+
+        {isSelectionMode && selectedPersonIds.size > 0 && (
+          <div className="mb-3 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold text-rose-700">{selectedPersonIds.size} seleccionados</span>
+            <button
+              onClick={() => {
+                if (window.confirm(`¿Estás seguro que deseas eliminar a las ${selectedPersonIds.size} personas seleccionadas? Se borrarán sus turnos permanentemente.`)) {
+                  onDeletePersons?.(Array.from(selectedPersonIds));
+                  setSelectedPersonIds(new Set());
+                  setIsSelectionMode(false);
+                }
+              }}
+              className="px-2 py-1 bg-rose-600 text-white text-[10px] uppercase font-bold rounded shadow-sm hover:bg-rose-700 active:scale-95 flex items-center gap-1 cursor-pointer"
+            >
+              <Trash2 size={12} />
+              Eliminar
+            </button>
+          </div>
+        )}
 
         {/* Dynamic add person form inline */}
         {showAddForm && (
@@ -398,7 +437,16 @@ export function PeopleSidebar({
             return (
               <div
                 key={person.id}
-                onClick={() => onSelectPerson(person)}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    const newSet = new Set(selectedPersonIds);
+                    if (newSet.has(person.id)) newSet.delete(person.id);
+                    else newSet.add(person.id);
+                    setSelectedPersonIds(newSet);
+                  } else {
+                    onSelectPerson(person);
+                  }
+                }}
                 className={`p-2 rounded flex items-center justify-between gap-1 group cursor-pointer border-l-2 transition-all duration-150 ${
                   isActiveFilter
                     ? 'bg-indigo-50/70 border-indigo-600 shadow-xs'
@@ -406,6 +454,14 @@ export function PeopleSidebar({
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
+                  {isSelectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedPersonIds.has(person.id)}
+                      readOnly
+                      className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                    />
+                  )}
                   <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs select-none ${personBg} shrink-0`}>
                     {getInitials(person.name)}
                   </div>
@@ -445,7 +501,7 @@ export function PeopleSidebar({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                  <div className="flex items-center gap-1 opacity-75 group-hover:opacity-100 transition-all duration-200">
                     {/* Fast shift insertion trigger button */}
                     <button
                       onClick={(e) => {
@@ -465,7 +521,7 @@ export function PeopleSidebar({
                           e.stopPropagation();
                           onEditPerson(person);
                         }}
-                        title="Programar/Registrar turno detallado"
+                        title="Ver/Editar Ficha del Colaborador"
                         className="p-1 hover:bg-slate-100 border border-dashed border-slate-205 hover:border-slate-400 rounded text-slate-500 hover:text-slate-800 cursor-pointer"
                       >
                         <Edit2 size={13} />
