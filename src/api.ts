@@ -29,14 +29,10 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
 
 export const saveDb = async (data: Partial<DatabaseSchema>) => {
   try {
-    // First, fetch the latest to merge
-    const current = await fetchDb();
-    const merged = { ...current, ...data };
-    
     await fetch('/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(merged)
+      body: JSON.stringify(data)
     });
   } catch (error) {
     console.error('Failed to save DB', error);

@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,10 @@ const FTP_CONFIG = {
   secure: false
 };
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
+
+const supabaseUrl = process.env.SUPABASE_URL || 'https://fwsnaasfxfzacchsyijx.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c25hYXNmeGZ6YWNjaHN5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzkxMzksImV4cCI6MjA5MDExNTEzOX0.I9QYbMGbk53SnkfZW7ixICNW9xnUahaRxAKDPK9Vo90';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -92,13 +97,13 @@ async function syncFromFtpInternal() {
   const client = new ftp.Client();
   const localExcelPath = path.join(__dirname, `Turnos_temp_sync_${Date.now()}.xlsx`);
   try {
-    console.log("Connecting to FTP to sync...");
+    console.log("Connecting to FTP to sync turnos...");
     await client.access(FTP_CONFIG);
     await client.cd(FTP_DIR);
     console.log("Downloading Turnos.xlsx...");
     await client.downloadTo(localExcelPath, "Turnos.xlsx");
     
-    console.log("Reading workbook...");
+    console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
     // Parse Sheet1 (Demand aggregation)
@@ -142,72 +147,63 @@ async function syncFromFtpInternal() {
       }));
     }
 
-    // Parse persons
-    if (workbook.Sheets["persons"]) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets["persons"]) as any[];
-      personsCache = rows.map(p => ({
-        id: String(p.id),
-        name: String(p.name),
-        area: String(p.area),
-        maxDailyHours: Number(p.maxDailyHours),
-        availabilityStart: Number(p.availabilityStart),
-        availabilityEnd: Number(p.availabilityEnd),
-        color: String(p.color),
-        legajo: p.legajo ? String(p.legajo) : undefined,
-        possibleShifts: p.possibleShifts ? JSON.parse(String(p.possibleShifts)) : undefined
-      }));
-    } else {
-      personsCache = [];
-    }
-
-    // Parse shifts
-    if (workbook.Sheets["shifts"]) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets["shifts"]) as any[];
-      shiftsCache = rows.map(s => ({
-        id: String(s.id),
-        personId: String(s.personId),
-        date: String(s.date),
-        startHour: Number(s.startHour),
-        duration: Number(s.duration),
-        area: String(s.area)
-      }));
-    } else {
-      shiftsCache = [];
-    }
-
-    // Parse targets
-    if (workbook.Sheets["targets"]) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets["targets"]) as any[];
-      targetsCache = rows.map(t => ({
-        area: String(t.area),
-        dayOfWeek: Number(t.dayOfWeek),
-        hourlyTargets: t.hourlyTargets ? JSON.parse(String(t.hourlyTargets)) : Array(24).fill(0)
-      }));
-    } else {
-      targetsCache = [];
-    }
-
-    // Parse areas
-    if (workbook.Sheets["areas"]) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets["areas"]) as any[];
-      areasCache = rows.map(a => String(a.name));
-    } else {
+    // 2. Fetch planning data from Supabase
+    console.log("Fetching planning data from Supabase...");
+    
+    // Fetch areas
+    const areasRes = await supabase.from('planning_areas').select('*');
+    if (areasRes.error) throw areasRes.error;
+    areasCache = areasRes.data.map(a => String(a.name));
+    if (areasCache.length === 0) {
       areasCache = ['Atención', 'Soporte', 'Ventas', 'Administración'];
     }
 
-    // Parse attendance
-    if (workbook.Sheets["attendance"]) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets["attendance"]) as any[];
-      attendanceCache = rows.map(a => ({
-        shiftId: String(a.shiftId),
-        dateString: String(a.dateString),
-        status: String(a.status)
-      }));
-    } else {
-      attendanceCache = [];
-    }
+    // Fetch employees (planning_employees)
+    const personsRes = await supabase.from('planning_employees').select('*');
+    if (personsRes.error) throw personsRes.error;
+    personsCache = personsRes.data.map(p => ({
+      id: String(p.id),
+      name: String(p.name),
+      area: String(p.area),
+      maxDailyHours: Number(p.max_daily_hours),
+      availabilityStart: Number(p.availability_start),
+      availabilityEnd: Number(p.availability_end),
+      color: String(p.color),
+      legajo: p.legajo ? String(p.legajo) : undefined,
+      possibleShifts: p.possible_shifts || []
+    }));
 
-    console.log(`Sync from FTP successful. Demand dates: ${demandCache.length}, Persons: ${personsCache.length}, Shifts: ${shiftsCache.length}`);
+    // Fetch shifts (planning_shifts)
+    const shiftsRes = await supabase.from('planning_shifts').select('*');
+    if (shiftsRes.error) throw shiftsRes.error;
+    shiftsCache = shiftsRes.data.map(s => ({
+      id: String(s.id),
+      personId: String(s.person_id),
+      date: String(s.date),
+      startHour: Number(s.start_hour),
+      duration: Number(s.duration),
+      area: String(s.area)
+    }));
+
+    // Fetch targets (planning_targets)
+    const targetsRes = await supabase.from('planning_targets').select('*');
+    if (targetsRes.error) throw targetsRes.error;
+    targetsCache = targetsRes.data.map(t => ({
+      area: String(t.area),
+      dayOfWeek: Number(t.day_of_week),
+      hourlyTargets: t.hourly_targets || Array(24).fill(0)
+    }));
+
+    // Fetch attendance (planning_attendance)
+    const attendanceRes = await supabase.from('planning_attendance').select('*');
+    if (attendanceRes.error) throw attendanceRes.error;
+    attendanceCache = attendanceRes.data.map(a => ({
+      shiftId: String(a.shift_id),
+      dateString: String(a.date_string),
+      status: String(a.status)
+    }));
+
+    console.log(`Sync from FTP & Supabase successful. Demand dates: ${demandCache.length}, Persons: ${personsCache.length}, Shifts: ${shiftsCache.length}`);
   } catch (error) {
     console.error("Error in syncFromFtpInternal:", error);
     throw error;
@@ -222,135 +218,94 @@ async function syncFromFtpInternal() {
 }
 
 async function uploadToFtpInternal(data: any) {
-  const client = new ftp.Client();
-  const localExcelPath = path.join(__dirname, `Turnos_temp_upload_${Date.now()}.xlsx`);
   try {
-    // 1. Download current file from FTP to local to preserve Sheet1 and get current sheets
-    console.log("Downloading current Turnos.xlsx from FTP to prepare upload...");
-    await client.access(FTP_CONFIG);
-    await client.cd(FTP_DIR);
-    await client.downloadTo(localExcelPath, "Turnos.xlsx");
-
-    const workbook = XLSX.readFile(localExcelPath);
-
-    // Update in-memory caches
+    console.log("Updating in-memory caches and writing to Supabase...");
+    
+    // Update caches in memory if provided
     if (data.persons) personsCache = data.persons;
     if (data.shifts) shiftsCache = data.shifts;
     if (data.targets) targetsCache = data.targets;
     if (data.areas) areasCache = data.areas;
     if (data.attendance) attendanceCache = data.attendance;
 
-    const areasData = areasCache.map(name => ({ name }));
-    const personsData = personsCache.map(p => ({
-      id: p.id,
-      name: p.name,
-      area: p.area,
-      maxDailyHours: p.maxDailyHours,
-      availabilityStart: p.availabilityStart,
-      availabilityEnd: p.availabilityEnd,
-      color: p.color,
-      legajo: p.legajo || "",
-      possibleShifts: p.possibleShifts ? JSON.stringify(p.possibleShifts) : ""
-    }));
-    const shiftsData = shiftsCache.map(s => ({
-      id: s.id,
-      personId: s.personId,
-      date: s.date,
-      startHour: s.startHour,
-      duration: s.duration,
-      area: s.area
-    }));
-    const targetsData = targetsCache.map(t => ({
-      area: t.area,
-      dayOfWeek: t.dayOfWeek,
-      hourlyTargets: t.hourlyTargets ? JSON.stringify(t.hourlyTargets) : ""
-    }));
-    const attendanceData = attendanceCache.map(a => ({
-      shiftId: a.shiftId,
-      dateString: a.dateString,
-      status: a.status
-    }));
-
-    const sheetsMap: Record<string, any[]> = {
-      "areas": areasData,
-      "persons": personsData,
-      "shifts": shiftsData,
-      "targets": targetsData,
-      "attendance": attendanceData
-    };
-
-    // Remove existing sheets from workbook
-    Object.keys(sheetsMap).forEach(sheetName => {
-      if (workbook.SheetNames.includes(sheetName)) {
-        const sheetIndex = workbook.SheetNames.indexOf(sheetName);
-        workbook.SheetNames.splice(sheetIndex, 1);
-        delete workbook.Sheets[sheetName];
+    // 1. Save areas
+    if (data.areas) {
+      await supabase.from('planning_areas').delete().neq('name', 'dummy_delete_val_xyz');
+      if (areasCache.length > 0) {
+        const { error } = await supabase.from('planning_areas').insert(areasCache.map(name => ({ name })));
+        if (error) throw error;
       }
-    });
-
-    // Append new worksheets to workbook
-    Object.entries(sheetsMap).forEach(([sheetName, rows]) => {
-      const ws = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(workbook, ws, sheetName);
-    });
-
-    // Write back workbook locally
-    XLSX.writeFile(workbook, localExcelPath);
-
-    // Upload workbook back to FTP
-    console.log("Uploading updated Turnos.xlsx to FTP...");
-    await client.uploadFrom(localExcelPath, "Turnos.xlsx");
-    console.log("Upload successful!");
-
-    // Also update our demandCache in case Sheet1 has any new changes
-    if (workbook.Sheets["Sheet1"]) {
-      const sheet = workbook.Sheets["Sheet1"];
-      const rows = XLSX.utils.sheet_to_json(sheet) as any[];
-      const demandMap: Record<string, { dateString: string; area: string; hourlyArtPatients: number[]; hourlyOsPatients: number[] }> = {};
-      rows.forEach((row: any) => {
-        const serialDate = row["Turno"];
-        if (!serialDate || typeof serialDate !== "number") return;
-        
-        const { dateString, hour } = parseExcelDateTime(serialDate);
-        const cobertura = row["Cobertura"] ? String(row["Cobertura"]).toUpperCase() : "";
-        const isArt = cobertura.includes("ART");
-        
-        if (!demandMap[dateString]) {
-          demandMap[dateString] = {
-            dateString,
-            area: 'Admision',
-            hourlyArtPatients: Array(24).fill(0),
-            hourlyOsPatients: Array(24).fill(0)
-          };
-        }
-        
-        if (hour >= 0 && hour < 24) {
-          if (isArt) {
-            demandMap[dateString].hourlyArtPatients[hour]++;
-          } else {
-            demandMap[dateString].hourlyOsPatients[hour]++;
-          }
-        }
-      });
-
-      demandCache = Object.values(demandMap).map(d => ({
-        dateString: d.dateString,
-        area: d.area,
-        hourlyRequirements: Array(24).fill(0),
-        hourlyArtPatients: d.hourlyArtPatients,
-        hourlyOsPatients: d.hourlyOsPatients
-      }));
     }
+
+    // 2. Save employees
+    if (data.persons) {
+      await supabase.from('planning_employees').delete().neq('id', 'dummy_delete_val_xyz');
+      if (personsCache.length > 0) {
+        const mappedPersons = personsCache.map(p => ({
+          id: p.id,
+          name: p.name,
+          area: p.area,
+          max_daily_hours: Number(p.maxDailyHours),
+          availability_start: Number(p.availabilityStart),
+          availability_end: Number(p.availabilityEnd),
+          color: p.color,
+          legajo: p.legajo || "",
+          possible_shifts: p.possibleShifts || []
+        }));
+        const { error } = await supabase.from('planning_employees').insert(mappedPersons);
+        if (error) throw error;
+      }
+    }
+
+    // 3. Save shifts
+    if (data.shifts) {
+      await supabase.from('planning_shifts').delete().neq('id', 'dummy_delete_val_xyz');
+      if (shiftsCache.length > 0) {
+        const mappedShifts = shiftsCache.map(s => ({
+          id: s.id,
+          person_id: s.personId,
+          date: s.date,
+          start_hour: Number(s.startHour),
+          duration: Number(s.duration),
+          area: s.area
+        }));
+        const { error } = await supabase.from('planning_shifts').insert(mappedShifts);
+        if (error) throw error;
+      }
+    }
+
+    // 4. Save targets
+    if (data.targets) {
+      await supabase.from('planning_targets').delete().neq('area', 'dummy_delete_val_xyz');
+      if (targetsCache.length > 0) {
+        const mappedTargets = targetsCache.map(t => ({
+          area: t.area,
+          day_of_week: Number(t.dayOfWeek),
+          hourly_targets: t.hourlyTargets || []
+        }));
+        const { error } = await supabase.from('planning_targets').insert(mappedTargets);
+        if (error) throw error;
+      }
+    }
+
+    // 5. Save attendance
+    if (data.attendance) {
+      await supabase.from('planning_attendance').delete().neq('shift_id', 'dummy_delete_val_xyz');
+      if (attendanceCache.length > 0) {
+        const mappedAttendance = attendanceCache.map(a => ({
+          shift_id: a.shiftId,
+          date_string: a.dateString,
+          status: a.status
+        }));
+        const { error } = await supabase.from('planning_attendance').insert(mappedAttendance);
+        if (error) throw error;
+      }
+    }
+
+    console.log("Supabase save complete!");
   } catch (error) {
     console.error("Error in uploadToFtpInternal:", error);
     throw error;
-  } finally {
-    client.close();
-    if (fs.existsSync(localExcelPath)) {
-      try {
-        fs.unlinkSync(localExcelPath);
-      } catch (e) {}
-    }
   }
 }
 
@@ -371,7 +326,7 @@ app.get('/api/db', async (req, res) => {
     });
   } catch (err) {
     console.error('Failed to read database:', err);
-    res.status(500).json({ error: 'Failed to read database from FTP' });
+    res.status(500).json({ error: 'Failed to read database from Supabase/FTP' });
   }
 });
 
@@ -381,9 +336,9 @@ app.post('/api/db', async (req, res) => {
     const data = req.body;
 
     // Safety guard: prevent overwriting with empty persons list due to frontend loading issues
-    if (!data.persons || !Array.isArray(data.persons) || data.persons.length === 0) {
-      console.warn("Safety guard triggered: POST payload has empty or missing persons. Aborting database overwrite to prevent data loss.");
-      return res.status(400).json({ error: "Safety guard: payload must contain at least one person." });
+    if (data.persons !== undefined && (!Array.isArray(data.persons) || data.persons.length === 0)) {
+      console.warn("Safety guard triggered: POST payload has empty persons array. Aborting database overwrite to prevent data loss.");
+      return res.status(400).json({ error: "Safety guard: persons array cannot be empty." });
     }
 
     await ftpQueue.add(async () => {
@@ -392,14 +347,14 @@ app.post('/api/db', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Failed to write database:', err);
-    res.status(500).json({ error: 'Failed to write database to FTP' });
+    res.status(500).json({ error: 'Failed to write database to Supabase' });
   }
 });
 
 const PORT = 3021;
 app.listen(PORT, async () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log("Initializing local cache from FTP on startup...");
+  console.log("Initializing local cache from FTP & Supabase on startup...");
   try {
     await ftpQueue.add(async () => {
       await syncFromFtpInternal();

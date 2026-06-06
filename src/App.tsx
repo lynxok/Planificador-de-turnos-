@@ -23,6 +23,7 @@ import { ExcelImporterModal } from './components/ExcelImporterModal';
 import { DemandCalculatorModal } from './components/DemandCalculatorModal';
 import { AttendanceTrackerModal } from './components/AttendanceTrackerModal';
 import { ThemeSelector } from './components/ThemeSelector';
+import { StaffManagement } from './components/StaffManagement';
 import { THEMES } from './themes';
 
 // Icons
@@ -72,7 +73,7 @@ export default function App() {
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff'>('day');
   const [activeArea, setActiveArea] = useState<Area>('Atención');
   const [activeTab, setActiveTab] = useState<Area | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -635,7 +636,13 @@ export default function App() {
   };
 
   const handleSavePerson = (updatedPerson: Person) => {
-    const updated = persons.map(p => p.id === updatedPerson.id ? updatedPerson : p);
+    let updated;
+    const exists = persons.some(p => p.id === updatedPerson.id);
+    if (exists) {
+      updated = persons.map(p => p.id === updatedPerson.id ? updatedPerson : p);
+    } else {
+      updated = [...persons, updatedPerson];
+    }
     setPersons(updated);
     
     saveDb({
@@ -989,9 +996,19 @@ export default function App() {
             >
               Análisis de Turnera
             </button>
+            <button
+              onClick={() => setViewMode('staff')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                viewMode === 'staff'
+                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Gestión de Personal
+            </button>
           </div>
 
-          {viewMode !== 'analysis' && (
+          {viewMode !== 'analysis' && viewMode !== 'staff' && (
             <>
               <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
                 <button
@@ -1069,7 +1086,7 @@ export default function App() {
           )}
         </div>
         {/* Calendar Days Horizon Carousel */}
-        {viewMode !== 'analysis' && (
+        {viewMode !== 'analysis' && viewMode !== 'staff' && (
           <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar px-1">
           {monthDays.map((day: CalendarDay) => {
             const isSelected = viewMode === 'day'
@@ -1162,7 +1179,7 @@ export default function App() {
                 <span className="text-xs font-bold text-slate-700 font-sans">Reporte Estadístico e Histórico Consolidador</span>
               </div>
               <a 
-                href="/analisis_turnos.html" 
+                href="./analisis_turnos.html" 
                 target="_blank" 
                 rel="noreferrer"
                 className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
@@ -1171,11 +1188,35 @@ export default function App() {
               </a>
             </div>
             <iframe 
-              src="/analisis_turnos.html" 
+              src="./analisis_turnos.html" 
               className="flex-1 w-full h-full border-0" 
               title="Análisis de Turnos"
             />
           </div>
+        ) : viewMode === 'staff' ? (
+          <StaffManagement
+            persons={persons}
+            areas={areas}
+            onAddPerson={() => {
+              setEditingPerson({
+                id: 'p_new_' + Date.now(),
+                name: '',
+                area: areas[0] || 'Admision',
+                maxDailyHours: 8,
+                availabilityStart: 8,
+                availabilityEnd: 17,
+                color: 'indigo',
+                possibleShifts: []
+              });
+              setIsPersonModalOpen(true);
+            }}
+            onEditPerson={(person) => {
+              setEditingPerson(person);
+              setIsPersonModalOpen(true);
+            }}
+            onDeletePerson={handleDeletePersonFromDb}
+            theme={activeTheme}
+          />
         ) : (
           <>
             {/* Left column: People sidebar (Manage resources) */}
