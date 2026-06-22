@@ -17,7 +17,10 @@ const FTP_CONFIG = {
   host: process.env.FTP_HOST || "turnera-040626z.iteosrl.com.ar",
   user: process.env.FTP_USER || "ip000541",
   password: process.env.FTP_PASSWORD || "JM8Pog2SR*2a7oU",
-  secure: false
+  secure: true,
+  secureOptions: {
+    rejectUnauthorized: false
+  }
 };
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
@@ -93,6 +96,24 @@ class TaskQueue {
 
 const ftpQueue = new TaskQueue();
 
+function parseExcelDateTimeForUpsert(serial: number) {
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400 * 1000;
+  const dateObj = new Date(utc_value);
+
+  const fractional_day = serial - Math.floor(serial);
+  const total_seconds = Math.round(fractional_day * 24 * 60 * 60);
+  const hours = Math.floor(total_seconds / 3600);
+  const minutes = Math.floor((total_seconds % 3600) / 60);
+  const seconds = total_seconds % 60;
+  
+  const yyyy = dateObj.getUTCFullYear();
+  const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getUTCDate()).padStart(2, '0');
+  
+  return `${yyyy}-${mm}-${dd} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 async function syncFromFtpInternal() {
   const client = new ftp.Client();
   const localExcelPath = path.join(__dirname, `Turnos_temp_sync_${Date.now()}.xlsx`);
@@ -110,100 +131,47 @@ async function syncFromFtpInternal() {
     if (workbook.Sheets["Sheet1"]) {
       const sheet = workbook.Sheets["Sheet1"];
       const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+      console.log(`Loaded ${rows.length} rows from Excel Sheet1.`);
       
-      const demandMap: Record<string, { dateString: string; area: string; hourlyArtPatients: number[]; hourlyOsPatients: number[] }> = {};
-      rows.forEach((row: any) => {
-        const serialDate = row["Turno"];
-        if (!serialDate || typeof serialDate !== "number") return;
+      console.log("Mapping and deduplicating rows...");
+      const uniqueMap = new Map();
+      rows.forEach((r: any) => {
+        const serial = r["Turno"];
+        if (!serial || typeof serial !== 'number') return;
         
-        const { dateString, hour } = parseExcelDateTime(serialDate);
-        const cobertura = row["Cobertura"] ? String(row["Cobertura"]).toUpperCase() : "";
-        const isArt = cobertura.includes("ART");
+        const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
+        const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;
         
-        if (!demandMap[dateString]) {
-          demandMap[dateString] = {
-            dateString,
-            area: 'Admision',
-            hourlyArtPatients: Array(24).fill(0),
-            hourlyOsPatients: Array(24).fill(0)
-          };
-        }
-        
-        if (hour >= 0 && hour < 24) {
-          if (isArt) {
-            demandMap[dateString].hourlyArtPatients[hour]++;
-          } else {
-            demandMap[dateString].hourlyOsPatients[hour]++;
-          }
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
+            profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
+            cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
+            turno: turnoTimestamp,
+            asistio: r["Asistio"] !== undefined && r["Asistio"] !== null ? Number(r["Asistio"]) : 0,
+            atendido: r["Atendido"] !== undefined && r["Atendido"] !== null ? Number(r["Atendido"]) : 0,
+            nro_hc: r["NroHc"] !== undefined && r["NroHc"] !== null ? String(r["NroHc"]).trim() : ""
+          });
         }
       });
-
-      demandCache = Object.values(demandMap).map(d => ({
-        dateString: d.dateString,
-        area: d.area,
-        hourlyRequirements: Array(24).fill(0),
-        hourlyArtPatients: d.hourlyArtPatients,
-        hourlyOsPatients: d.hourlyOsPatients
-      }));
+      const mappedRows = Array.from(uniqueMap.values());
+      console.log(`Mapped ${mappedRows.length} unique rows.`);
+      
+      // Batch upsert to Supabase
+      const BATCH_SIZE = 1000;
+      console.log(`Upserting to Supabase in batches of ${BATCH_SIZE}...`);
+      for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
+        const batch = mappedRows.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('planning_patient_appointments')
+          .upsert(batch, { onConflict: 'paciente,profesional,turno' });
+        if (error) {
+          console.error(`Error uploading batch at index ${i}:`, error.message);
+          throw error;
+        }
+      }
+      console.log("Database upsert complete.");
     }
-
-    // 2. Fetch planning data from Supabase
-    console.log("Fetching planning data from Supabase...");
-    
-    // Fetch areas
-    const areasRes = await supabase.from('planning_areas').select('*');
-    if (areasRes.error) throw areasRes.error;
-    areasCache = areasRes.data.map(a => String(a.name));
-    if (areasCache.length === 0) {
-      areasCache = ['Atención', 'Soporte', 'Ventas', 'Administración'];
-    }
-
-    // Fetch employees (planning_employees)
-    const personsRes = await supabase.from('planning_employees').select('*');
-    if (personsRes.error) throw personsRes.error;
-    personsCache = personsRes.data.map(p => ({
-      id: String(p.id),
-      name: String(p.name),
-      area: String(p.area),
-      maxDailyHours: Number(p.max_daily_hours),
-      availabilityStart: Number(p.availability_start),
-      availabilityEnd: Number(p.availability_end),
-      color: String(p.color),
-      legajo: p.legajo ? String(p.legajo) : undefined,
-      possibleShifts: p.possible_shifts || []
-    }));
-
-    // Fetch shifts (planning_shifts)
-    const shiftsRes = await supabase.from('planning_shifts').select('*');
-    if (shiftsRes.error) throw shiftsRes.error;
-    shiftsCache = shiftsRes.data.map(s => ({
-      id: String(s.id),
-      personId: String(s.person_id),
-      date: String(s.date),
-      startHour: Number(s.start_hour),
-      duration: Number(s.duration),
-      area: String(s.area)
-    }));
-
-    // Fetch targets (planning_targets)
-    const targetsRes = await supabase.from('planning_targets').select('*');
-    if (targetsRes.error) throw targetsRes.error;
-    targetsCache = targetsRes.data.map(t => ({
-      area: String(t.area),
-      dayOfWeek: Number(t.day_of_week),
-      hourlyTargets: t.hourly_targets || Array(24).fill(0)
-    }));
-
-    // Fetch attendance (planning_attendance)
-    const attendanceRes = await supabase.from('planning_attendance').select('*');
-    if (attendanceRes.error) throw attendanceRes.error;
-    attendanceCache = attendanceRes.data.map(a => ({
-      shiftId: String(a.shift_id),
-      dateString: String(a.date_string),
-      status: String(a.status)
-    }));
-
-    console.log(`Sync from FTP & Supabase successful. Demand dates: ${demandCache.length}, Persons: ${personsCache.length}, Shifts: ${shiftsCache.length}`);
   } catch (error) {
     console.error("Error in syncFromFtpInternal:", error);
     throw error;
@@ -215,6 +183,109 @@ async function syncFromFtpInternal() {
       } catch (e) {}
     }
   }
+}
+
+async function fetchAllFromSupabase() {
+  console.log("Fetching all planning data from Supabase...");
+  
+  // 1. Fetch areas
+  const areasRes = await supabase.from('planning_areas').select('*');
+  if (areasRes.error) throw areasRes.error;
+  areasCache = areasRes.data.map(a => String(a.name));
+  if (areasCache.length === 0) {
+    areasCache = ['Atención', 'Soporte', 'Ventas', 'Administración'];
+  }
+
+  // 2. Fetch employees (planning_employees)
+  const personsRes = await supabase.from('planning_employees').select('*');
+  if (personsRes.error) throw personsRes.error;
+  personsCache = personsRes.data.map(p => ({
+    id: String(p.id),
+    name: String(p.name),
+    area: String(p.area),
+    maxDailyHours: Number(p.max_daily_hours),
+    availabilityStart: Number(p.availability_start),
+    availabilityEnd: Number(p.availability_end),
+    color: String(p.color),
+    legajo: p.legajo ? String(p.legajo) : undefined,
+    possibleShifts: p.possible_shifts || []
+  }));
+
+  // 3. Fetch shifts (planning_shifts)
+  const shiftsRes = await supabase.from('planning_shifts').select('*');
+  if (shiftsRes.error) throw shiftsRes.error;
+  shiftsCache = shiftsRes.data.map(s => ({
+    id: String(s.id),
+    personId: String(s.person_id),
+    date: String(s.date),
+    startHour: Number(s.start_hour),
+    duration: Number(s.duration),
+    area: String(s.area)
+  }));
+
+  // 4. Fetch targets (planning_targets)
+  const targetsRes = await supabase.from('planning_targets').select('*');
+  if (targetsRes.error) throw targetsRes.error;
+  targetsCache = targetsRes.data.map(t => ({
+    area: String(t.area),
+    dayOfWeek: Number(t.day_of_week),
+    hourlyTargets: t.hourly_targets || Array(24).fill(0)
+  }));
+
+  // 5. Fetch attendance (planning_attendance)
+  const attendanceRes = await supabase.from('planning_attendance').select('*');
+  if (attendanceRes.error) throw attendanceRes.error;
+  attendanceCache = attendanceRes.data.map(a => ({
+    shiftId: String(a.shift_id),
+    dateString: String(a.date_string),
+    status: String(a.status)
+  }));
+
+  // 6. Fetch demand from our aggregated database view
+  console.log("Fetching aggregated demand from database view...");
+  let allDemandRows: any[] = [];
+  let pageIndex = 0;
+  const pageSize = 1000;
+  while (true) {
+    const demandRes = await supabase
+      .from('planning_patient_demand_view')
+      .select('*')
+      .range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1);
+    if (demandRes.error) throw demandRes.error;
+    if (!demandRes.data || demandRes.data.length === 0) break;
+    allDemandRows = allDemandRows.concat(demandRes.data);
+    if (demandRes.data.length < pageSize) break;
+    pageIndex++;
+  }
+  
+  const demandMap: Record<string, { dateString: string; area: string; hourlyRequirements: number[]; hourlyArtPatients: number[]; hourlyOsPatients: number[] }> = {};
+  allDemandRows.forEach((row: any) => {
+    const dateStr = row.date_string;
+    const hour = row.hour;
+    const isArt = row.is_art;
+    const count = row.count;
+    
+    if (!demandMap[dateStr]) {
+      demandMap[dateStr] = {
+        dateString: dateStr,
+        area: 'Admision',
+        hourlyRequirements: Array(24).fill(0),
+        hourlyArtPatients: Array(24).fill(0),
+        hourlyOsPatients: Array(24).fill(0)
+      };
+    }
+    
+    if (hour >= 0 && hour < 24) {
+      if (isArt) {
+        demandMap[dateStr].hourlyArtPatients[hour] += count;
+      } else {
+        demandMap[dateStr].hourlyOsPatients[hour] += count;
+      }
+    }
+  });
+  
+  demandCache = Object.values(demandMap);
+  console.log(`Fetch complete. Employees: ${personsCache.length}, Shifts: ${shiftsCache.length}, Demand days: ${demandCache.length}`);
 }
 
 async function uploadToFtpInternal(data: any) {
@@ -312,10 +383,7 @@ async function uploadToFtpInternal(data: any) {
 // API Endpoints
 app.get('/api/db', async (req, res) => {
   try {
-    console.log("GET /api/db: Queueing sync operation...");
-    await ftpQueue.add(async () => {
-      await syncFromFtpInternal();
-    });
+    // Serve instantly from cache (sub-50ms)
     res.json({
       persons: personsCache,
       shifts: shiftsCache,
@@ -324,9 +392,13 @@ app.get('/api/db', async (req, res) => {
       demand: demandCache,
       attendance: attendanceCache
     });
+    // Trigger background cache refresh to ensure it stays in sync
+    fetchAllFromSupabase().catch(err => {
+      console.error("Background Supabase fetch failed:", err);
+    });
   } catch (err) {
     console.error('Failed to read database:', err);
-    res.status(500).json({ error: 'Failed to read database from Supabase/FTP' });
+    res.status(500).json({ error: 'Failed to read database' });
   }
 });
 
@@ -351,14 +423,26 @@ app.post('/api/db', async (req, res) => {
   }
 });
 
+app.post('/api/sync-demand', async (req, res) => {
+  try {
+    console.log("POST /api/sync-demand: Queueing demand sync operation...");
+    await ftpQueue.add(async () => {
+      await syncFromFtpInternal();
+      await fetchAllFromSupabase();
+    });
+    res.json({ success: true, demandCount: demandCache.length });
+  } catch (err: any) {
+    console.error('Failed to sync demand:', err);
+    res.status(500).json({ error: 'Failed to sync demand from FTP', details: err.message });
+  }
+});
+
 const PORT = 3021;
 app.listen(PORT, async () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log("Initializing local cache from FTP & Supabase on startup...");
+  console.log("Initializing local cache from Supabase on startup...");
   try {
-    await ftpQueue.add(async () => {
-      await syncFromFtpInternal();
-    });
+    await fetchAllFromSupabase();
     console.log("Startup cache sync complete.");
   } catch (e) {
     console.error("Warning: Startup cache sync failed.", e);

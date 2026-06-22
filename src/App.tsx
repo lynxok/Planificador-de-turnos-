@@ -64,6 +64,7 @@ export default function App() {
   const [demand, setDemand] = useState<DemandRecord[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // 2. Navigation/View States
   const [activeDate, setActiveDate] = useState(() => {
@@ -729,6 +730,30 @@ export default function App() {
     setHasUnsavedChanges(true);
   };
 
+  const handleSyncDemand = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/sync-demand', { method: 'POST' });
+      if (!res.ok) throw new Error('Sync failed');
+      const result = await res.json();
+      alert(`¡Sincronización completada con éxito! Se sincronizaron los turnos en Supabase (Días con demanda: ${result.demandCount}).`);
+      
+      // Refresh the dashboard data
+      const data = await fetchDb();
+      setPersons(data.persons || []);
+      setShifts(data.shifts || []);
+      setTargets(data.targets || []);
+      setAreas(data.areas || []);
+      setDemand(data.demand || []);
+      setAttendance(data.attendance || []);
+    } catch (error) {
+      console.error('Failed to sync demand', error);
+      alert('Ocurrió un error al intentar sincronizar los turnos desde el FTP.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // 6. Reset to Factory seeds
   const handleResetData = () => {
     if (window.confirm('¿Estás seguro de que quieres restablecer todos los horarios y personas a su estado por defecto?')) {
@@ -879,7 +904,7 @@ export default function App() {
             <button
               onClick={handleManualSave}
               className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse"
-              title="Guardar cambios pendientes en la base de datos de Neon Postgres"
+              title="Guardar cambios pendientes en la base de datos de Supabase"
             >
               <Save size={14} className="text-white" />
               <span>Guardar Planificación</span>
@@ -894,6 +919,16 @@ export default function App() {
               <span>Sincronizado</span>
             </button>
           )}
+
+          <button
+            onClick={handleSyncDemand}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
+          >
+            <RefreshCw size={14} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
+          </button>
 
           <button
             onClick={() => setIsAttendanceModalOpen(true)}
