@@ -1202,9 +1202,6 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <span className="text-xs text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-3 py-1 rounded-lg hidden xl:inline font-medium">
-              💡 ¡Nuevo! Arrastra un turno y suéltalo en cualquier día del calendario para cambiar su día de asignación.
-            </span>
           </div>
         )}
 
