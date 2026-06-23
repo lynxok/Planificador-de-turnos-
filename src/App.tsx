@@ -1012,95 +1012,118 @@ export default function App() {
             </p>
           </div>
 
-          {/* Header Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            {hasUnsavedChanges ? (
-              <button
-                onClick={handleManualSave}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 animate-pulse"
-                title="Guardar cambios pendientes en la base de datos de Supabase"
-              >
-                <Save size={13} className="text-white" />
-                <span>Guardar Cambios</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleManualSave}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs"
-                title="Planificación guardada y sincronizada"
-              >
-                <CheckCircle2 size={13} className="text-emerald-600" />
-                <span>Sincronizado</span>
-              </button>
-            )}
-
-            <button
-              onClick={handleSyncDemand}
-              disabled={isSyncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50"
-              title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
-            >
-              <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
-            </button>
-
-            <button
-              onClick={() => setIsAttendanceModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-              title="Registrar Presentismo"
-            >
-              <CheckCircle2 size={13} className="text-blue-100" />
-              <span>Presentismo</span>
-            </button>
-
-            <button
-              onClick={() => setIsDemandModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-              title="Calculadora de Demanda"
-            >
-              <Clock size={13} className="text-orange-100" />
-              <span>Calcular Demanda</span>
-            </button>
-
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-              title="Importar turnos y empleados de una planilla Excel"
-            >
-              <FileSpreadsheet size={13} className="text-emerald-100" />
-              <span>Importar Excel</span>
-            </button>
-
-            {viewMode !== 'analysis' && viewMode !== 'staff' && (
-              <>
-                <button
-                  onClick={handleAutoBalanceCoverage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-750 active:scale-95 transition-all text-white rounded-lg cursor-pointer"
-                  title="Asigna automáticamente personas libres a horas con déficit"
-                >
-                  <Sparkles size={13} className="text-indigo-200" />
-                  <span>Auto-Asignar ({activeArea})</span>
-                </button>
-                
-                <button
-                  onClick={handleCopyWeek}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-                  title="Copiar toda la programación de esta semana a la siguiente"
-                >
-                  <span className="font-bold">+</span>
-                  <span>Copiar Semana</span>
-                </button>
-              </>
-            )}
+          {/* Header Action Buttons (Hover-revealed panel) */}
+          <div className="relative flex items-center justify-end h-10 min-w-[220px] group/actions">
             
-            <button
-              onClick={handleResetData}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-705 active:scale-95 text-slate-350 border border-slate-700/60 rounded-lg cursor-pointer"
-              title="Restaurar base de datos nativa"
-            >
-              <RefreshCw size={12} />
-              <span>Reajustar</span>
-            </button>
+            {/* Default Trigger state: shows sync status and a minimal actions button */}
+            <div className="flex items-center gap-2 group-hover/actions:opacity-0 group-hover/actions:pointer-events-none transition-all duration-200">
+              {hasUnsavedChanges ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                  <span>Pendiente Guardar</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-lg shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                  <span>Sincronizado</span>
+                </div>
+              )}
+              
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-[#0b0e14]/50 border border-slate-800/80 text-slate-400 hover:text-white rounded-lg cursor-pointer transition-colors shadow-xs">
+                <span>🛠️ Herramientas</span>
+              </button>
+            </div>
+
+            {/* Hover Reveal state: slides and fades in from the right, overlaying the trigger */}
+            <div className="absolute right-0 opacity-0 scale-95 pointer-events-none group-hover/actions:opacity-100 group-hover/actions:scale-100 group-hover/actions:pointer-events-auto flex items-center gap-2 transition-all duration-300 bg-[#0d1117]/95 border border-slate-800/90 shadow-2xl p-2 rounded-xl z-50">
+              {hasUnsavedChanges ? (
+                <button
+                  onClick={handleManualSave}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 animate-pulse"
+                  title="Guardar cambios pendientes en la base de datos de Supabase"
+                >
+                  <Save size={13} className="text-white" />
+                  <span>Guardar Cambios</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleManualSave}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-55 text-emerald-700 rounded-lg border border-emerald-250 cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs"
+                  title="Planificación guardada y sincronizada"
+                >
+                  <CheckCircle2 size={13} className="text-emerald-600" />
+                  <span>Sincronizado</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleSyncDemand}
+                disabled={isSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50"
+                title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
+              >
+                <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
+              </button>
+
+              <button
+                onClick={() => setIsAttendanceModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                title="Registrar Presentismo"
+              >
+                <CheckCircle2 size={13} className="text-blue-100" />
+                <span>Presentismo</span>
+              </button>
+
+              <button
+                onClick={() => setIsDemandModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                title="Calculadora de Demanda"
+              >
+                <Clock size={13} className="text-orange-100" />
+                <span>Calcular Demanda</span>
+              </button>
+
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                title="Importar turnos y empleados de una planilla Excel"
+              >
+                <FileSpreadsheet size={13} className="text-emerald-100" />
+                <span>Importar Excel</span>
+              </button>
+
+              {viewMode !== 'analysis' && viewMode !== 'staff' && (
+                <>
+                  <button
+                    onClick={handleAutoBalanceCoverage}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-750 active:scale-95 transition-all text-white rounded-lg cursor-pointer"
+                    title="Asigna automáticamente personas libres a horas con déficit"
+                  >
+                    <Sparkles size={13} className="text-indigo-200" />
+                    <span>Auto-Asignar ({activeArea})</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleCopyWeek}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                    title="Copiar toda la programación de esta semana a la siguiente"
+                  >
+                    <span className="font-bold">+</span>
+                    <span>Copiar Semana</span>
+                  </button>
+                </>
+              )}
+              
+              <button
+                onClick={handleResetData}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-705 active:scale-95 text-slate-350 border border-slate-700/60 rounded-lg cursor-pointer"
+                title="Restaurar base de datos nativa"
+              >
+                <RefreshCw size={12} />
+                <span>Reajustar</span>
+              </button>
+            </div>
           </div>
         </header>
 
