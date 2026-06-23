@@ -98,6 +98,11 @@ Al presionar el botón **"Sincronizar Turnos"** en la interfaz:
 * Al arrastrar turnos o modificar la cuadrícula, aparecerá el botón **"Guardar Planificación"** en color naranja de manera parpadeante (indicando cambios pendientes).
 * Al hacer clic, se guardarán los turnos y asistencia directamente en Supabase (tarda menos de 50ms). Una vez confirmado, el botón volverá a su estado verde como **"Sincronizado"**.
 
+### 4.7. Botones de Acción Interactivos (Hover Reveal)
+* Para mantener el encabezado limpio y maximizar el área de visualización, la barra de botones del encabezado permanece oculta por defecto.
+* Se muestra únicamente un indicador de estado compacto (`Sincronizado` o `Pendiente Guardar`) y el botón `🛠️ Herramientas`.
+* Al posicionar el cursor sobre ese sector, se desvanece el disparador y se revela instantáneamente un menú flotante con las 8 herramientas de acción. Al mover el cursor fuera del menú, este se repliega de forma limpia.
+
 ---
 
 ## 5. Procedimiento de Operación Diario y Mantenimiento
@@ -108,7 +113,17 @@ El sistema incluye scripts automatizados para el inicio y apagado limpio:
 * **Detener el Planificador**: Ejecuta el archivo `Detener_Planificador.bat` en la raíz para cerrar de forma segura todos los procesos colgados de Node.js o Vite y liberar los puertos.
 
 ### 5.2. Copias de Seguridad de Versiones (`Versiones anteriores`)
-Antes de cada compilación de distribución (`npm run build`), se debe copiar la carpeta `dist` anterior a la carpeta `Versiones anteriores/` asignándole un nombre de versión claro (ej. `dist_pre_supabase_single_source_of_truth`). Esto garantiza la posibilidad de un rollback inmediato en caso de fallos.
+Antes de cada compilación de distribución (`npm run build`), se debe copiar la carpeta `dist` anterior a la carpeta `Versiones anteriores/` asignándole un nombre de versión claro (ej. `dist_pre_hover_button_reveal`). Esto garantiza la posibilidad de un rollback inmediato en caso de fallos.
+
+### 5.3. Gestión de Repositorios (Git Multi-Remoto)
+El código fuente de este proyecto se gestiona de forma centralizada en dos repositorios remotos:
+1. **`origin`**: Repositorio principal de desarrollo (`https://github.com/AstudillaJS/Planificador-de-turnos.git`).
+2. **`lynxok`**: Repositorio de la organización/cuenta Lynx (`https://github.com/lynxok/Planificador-de-turnos-.git`).
+* Al realizar una subida de versión, se debe empujar a ambos destinos para mantener la copia del código sincronizada:
+  ```bash
+  git push origin main
+  git push lynxok main
+  ```
 
 ---
 
