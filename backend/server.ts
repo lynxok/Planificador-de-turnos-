@@ -38,6 +38,10 @@ let targetsCache: any[] = [];
 let areasCache: string[] = ['Atención', 'Soporte', 'Ventas', 'Administración'];
 let attendanceCache: any[] = [];
 let demandCache: any[] = [];
+let appointmentsCache: any[] = [];
+let professionalsCache: any[] = [];
+let coveragesCache: any[] = [];
+let appointmentsSummaryCache: any[] = [];
 
 // Helper to convert Excel serial datetime to YYYY-MM-DD and integer hour (0-23)
 function parseExcelDateTime(serial: number) {
@@ -283,9 +287,80 @@ async function fetchAllFromSupabase() {
       }
     }
   });
-  
   demandCache = Object.values(demandMap);
-  console.log(`Fetch complete. Employees: ${personsCache.length}, Shifts: ${shiftsCache.length}, Demand days: ${demandCache.length}`);
+
+  // 7. Fetch professionals metadata
+  console.log("Fetching professionals metadata...");
+  const { data: profsData, error: profsErr } = await supabase.from('turnera_profesionales').select('*');
+  if (profsErr) throw profsErr;
+  professionalsCache = profsData || [];
+
+  // 8. Fetch coverages metadata
+  console.log("Fetching coverages metadata...");
+  const { data: cobsData, error: cobsErr } = await supabase.from('turnera_coberturas').select('*');
+  if (cobsErr) throw cobsErr;
+  coveragesCache = cobsData || [];
+
+  // 9. Fetch all appointments from Supabase (planning_patient_appointments)
+  console.log("Fetching all patient appointments from Supabase...");
+  let allAppts: any[] = [];
+  let apptsPageIndex = 0;
+  const apptsPageSize = 1000;
+  while (true) {
+    const { data: apptsData, error: apptsErr } = await supabase
+      .from('planning_patient_appointments')
+      .select('profesional, cobertura, turno, asistio, atendido')
+      .range(apptsPageIndex * apptsPageSize, (apptsPageIndex + 1) * apptsPageSize - 1);
+    
+    if (apptsErr) throw apptsErr;
+    if (!apptsData || apptsData.length === 0) break;
+    allAppts = allAppts.concat(apptsData);
+    if (apptsData.length < apptsPageSize) break;
+    apptsPageIndex++;
+  }
+  appointmentsCache = allAppts;
+
+  // 10. Build the appointments summary cache for analysis
+  console.log(`Processing ${allAppts.length} appointments for analysis dashboard...`);
+  appointmentsSummaryCache = allAppts.map(r => {
+    let fechaLimpia = "Fecha desconocida";
+    let horaLimpia = "00:00";
+    if (r.turno) {
+      const parts = r.turno.split('T');
+      if (parts[0]) {
+        const dateParts = parts[0].split('-');
+        if (dateParts.length === 3) {
+          fechaLimpia = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+        }
+      }
+      if (parts[1]) {
+        horaLimpia = parts[1].substring(0, 5);
+      }
+    }
+
+    const prof = String(r.profesional || "").trim();
+    const cob = String(r.cobertura || "").trim();
+
+    const profObj = professionalsCache.find(p => String(p.profesional).trim().toUpperCase() === prof.toUpperCase());
+    const tipoConsulta = profObj ? profObj.tipo_consulta : "Sin Clasificar";
+
+    const cobObj = coveragesCache.find(c => String(c.cobertura).trim().toUpperCase() === cob.toUpperCase());
+    const clase = cobObj ? cobObj.clase : "Sin Clasificar";
+
+    const atendidoLabel = (r.asistio === 1 || r.atendido === 1) ? "Asistió" : "No asistió";
+
+    return {
+      FechaLimpia: fechaLimpia,
+      Doctor: r.profesional || "Sin Médico",
+      CoberturaLimpia: r.cobertura || "Sin Cobertura",
+      HoraLimpia: horaLimpia,
+      Clase: clase,
+      "Tipo Consulta": tipoConsulta,
+      Atendido_Label: atendidoLabel
+    };
+  });
+
+  console.log(`Fetch complete. Employees: ${personsCache.length}, Shifts: ${shiftsCache.length}, Demand days: ${demandCache.length}, Total Analysis Appointments: ${appointmentsSummaryCache.length}`);
 }
 
 async function uploadToFtpInternal(data: any) {
@@ -435,6 +510,10 @@ app.post('/api/sync-demand', async (req, res) => {
     console.error('Failed to sync demand:', err);
     res.status(500).json({ error: 'Failed to sync demand from FTP', details: err.message });
   }
+});
+
+app.get('/api/appointments-summary', (req, res) => {
+  res.json(appointmentsSummaryCache);
 });
 
 const PORT = 3021;

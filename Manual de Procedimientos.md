@@ -65,18 +65,36 @@ Al presionar el botón **"Sincronizar Turnos"** en la interfaz:
 3. Procesa e identifica los registros de citas.
 4. **Deduplicación Estricta**: Genera una clave única basada en `paciente_profesional_turno` y realiza un `upsert` por lotes de 1000 registros en la tabla `planning_patient_appointments` de Supabase.
 5. Invalida y refresca el caché en memoria del backend consultando la vista actualizada.
-6. El frontend actualiza los gráficos de demanda de forma automática.
+6. El frontend actualiza la interfaz tras completar la sincronización.
 
 ---
 
 ## 4. Manual de Operación en la Interfaz (Frontend)
 
-### 4.1. Sincronización Manual de Turnos
-1. Haz clic en el botón **"Sincronizar Turnos"** (ubicado en el encabezado junto al botón de guardar).
+### 4.1. Nueva Barra Lateral Izquierda (Navegación Vertical SaaS)
+* **Menú Colapsable**: El panel izquierdo actúa como la barra central de navegación, permitiendo alternar instantáneamente entre **Vista Diaria**, **Semana Completa**, **Análisis de Turnera** y **Gestión de Personal**.
+* **Contracción / Expansión**: El botón de menú (tres líneas) en la superior del menú contrae la barra lateral a solo iconos (`w-20`) para maximizar el área de trabajo, o la expande a texto completo (`w-64`).
+
+### 4.2. Ajuste de Temas Estéticos (Popover Flotante)
+* Al pie de la barra lateral izquierda, el botón **"Ajustar Tema"** (ícono de paleta de colores y engranaje) abre una ventana emergente modal con efecto *Glassmorphism*.
+* Permite seleccionar cualquiera de los 8 temas disponibles. Al elegir un tema, los cambios se guardan automáticamente en el almacenamiento local y la ventana emergente se cierra de forma inteligente al hacer clic fuera del panel.
+
+### 4.3. Panel de Colaboradores Ocultable (People Sidebar)
+* En la pantalla de planificación, el panel lateral de recursos se puede ocultar haciendo clic en la solapa del Chevron izquierdo (`‹`) al borde de la lista.
+* Al contraerse, la cuadrícula de planificación se expande al **100% de la pantalla**, brindando un espacio de trabajo amplio.
+* Para restaurar el panel de personal, haz clic en el botón de personas (`Users`) flotante que aparece en el lateral izquierdo.
+
+### 4.4. Visualización Completa sin Desplazamientos Internos (Scroll Único)
+* El planificador se dibuja de forma completa y continua de arriba a abajo.
+* No existen barras de desplazamiento vertical internas dentro de la grilla de turnos. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
+* El **Monitor de Cobertura y Densidad** se ubica naturalmente al pie de la página, por lo que para observarlo basta con desplazarse al final de la página web.
+
+### 4.5. Sincronización Manual de Turnos
+1. Haz clic en el botón **"Sincronizar Turnos"** (ubicado en el encabezado del planificador).
 2. El botón mostrará un spinner giratorio y cambiará su texto a **"Sincronizando..."**. Durante este proceso, las consultas FTP y la subida en lotes a Supabase se ejecutarán de fondo de forma segura.
 3. Al finalizar, recibirás una alerta de éxito indicando que la base de datos fue actualizada y los nuevos datos se cargarán en pantalla de inmediato.
 
-### 4.2. Guardado de Planificación
+### 4.6. Guardado de Planificación
 * Al arrastrar turnos o modificar la cuadrícula, aparecerá el botón **"Guardar Planificación"** en color naranja de manera parpadeante (indicando cambios pendientes).
 * Al hacer clic, se guardarán los turnos y asistencia directamente en Supabase (tarda menos de 50ms). Una vez confirmado, el botón volverá a su estado verde como **"Sincronizado"**.
 

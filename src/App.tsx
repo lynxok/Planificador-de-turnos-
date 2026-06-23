@@ -22,7 +22,7 @@ import { PersonEditorModal } from './components/PersonEditorModal';
 import { ExcelImporterModal } from './components/ExcelImporterModal';
 import { DemandCalculatorModal } from './components/DemandCalculatorModal';
 import { AttendanceTrackerModal } from './components/AttendanceTrackerModal';
-import { ThemeSelector } from './components/ThemeSelector';
+import { ThemeSelectorPopover } from './components/ThemeSelectorPopover';
 import { StaffManagement } from './components/StaffManagement';
 import { THEMES } from './themes';
 
@@ -40,7 +40,13 @@ import {
   Undo,
   ChevronLeft,
   ChevronRight,
-  Save
+  Save,
+  Settings,
+  Palette,
+  Menu,
+  CalendarDays,
+  BarChart3,
+  Users
 } from 'lucide-react';
 
 export default function App() {
@@ -75,6 +81,9 @@ export default function App() {
     return `${yyyy}-${mm}-${dd}`;
   });
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff'>('day');
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
+  const [showResourceSidebar, setShowResourceSidebar] = useState<boolean>(true);
+  const [isThemePopoverOpen, setIsThemePopoverOpen] = useState<boolean>(false);
   const [activeArea, setActiveArea] = useState<Area>('Atención');
   const [activeTab, setActiveTab] = useState<Area | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -880,518 +889,597 @@ export default function App() {
   const activeDayOfWeekShifts = shifts.filter((s) => s.date === activeDate);
 
   return (
-    <div className={`min-h-screen ${activeTheme.bg} transition-colors duration-300 font-sans flex flex-col antialiased`}>
+    <div className={`min-h-screen ${activeTheme.bg} transition-colors duration-300 font-sans flex flex-col lg:flex-row antialiased`}>
       
-      {/* 1. Header Area bar */}
-      <header className={`${activeTheme.headerBg} ${activeTheme.headerBorder} ${activeTheme.headerText} px-6 py-4 flex flex-col lg:flex-row items-center justify-between gap-4 sticky top-0 z-45 shrink-0 transition-colors duration-300`}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-xl shadow-lg border border-indigo-500">
-            <Calendar size={22} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">
-              Planificador de Cobertura de Turnos
+      {/* Left Navigation Sidebar */}
+      <aside className={`shrink-0 h-screen sticky top-0 z-45 bg-[#0b0e14] border-r border-slate-800/80 text-slate-350 transition-all duration-300 flex flex-col select-none ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
+          {isSidebarExpanded ? (
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
+                <Calendar size={18} className="text-white" />
+              </div>
+              <span className="font-extrabold text-sm tracking-wide text-white font-sans uppercase">Planificador</span>
+            </div>
+          ) : (
+            <div className="mx-auto p-2 bg-indigo-600 rounded-xl shadow-lg">
+              <Calendar size={18} className="text-white" />
+            </div>
+          )}
+          
+          <button
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white cursor-pointer hidden md:inline-block"
+            title={isSidebarExpanded ? "Contraer menú" : "Expandir menú"}
+          >
+            <Menu size={16} />
+          </button>
+        </div>
+
+        {/* Sidebar Navigation Menu */}
+        <div className="flex-1 p-3 flex flex-col gap-1.5 overflow-y-auto">
+          {isSidebarExpanded && (
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2.5 mb-1.5">Vistas</div>
+          )}
+          
+          <button
+            onClick={() => setViewMode('day')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'day'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Vista Diaria"
+          >
+            <Calendar size={16} />
+            {isSidebarExpanded && <span>Vista Diaria</span>}
+          </button>
+
+          <button
+            onClick={() => {
+              setViewMode('week');
+              const mondayDate = getWeekDates(activeDate)[0];
+              setActiveDate(mondayDate);
+            }}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'week'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Semana Completa"
+          >
+            <CalendarDays size={16} />
+            {isSidebarExpanded && <span>Semana Completa</span>}
+          </button>
+
+          <button
+            onClick={() => setViewMode('analysis')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'analysis'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Análisis de Turnera"
+          >
+            <BarChart3 size={16} />
+            {isSidebarExpanded && <span>Análisis de Turnera</span>}
+          </button>
+
+          <button
+            onClick={() => setViewMode('staff')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'staff'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Gestión de Personal"
+          >
+            <Users size={16} />
+            {isSidebarExpanded && <span>Gestión de Personal</span>}
+          </button>
+        </div>
+
+        {/* Sidebar Footer (Theme Settings trigger) */}
+        <div className="p-3 border-t border-slate-800 flex flex-col gap-2 bg-[#080b0f]">
+          <button
+            onClick={() => setIsThemePopoverOpen(true)}
+            className="flex items-center justify-between w-full px-3 py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white hover:bg-slate-850 transition-all cursor-pointer border border-slate-800 bg-slate-900/30"
+            title="Ajustes de Temas"
+          >
+            <div className="flex items-center gap-2.5">
+              <Palette size={15} className="text-[#d4af37]" />
+              {isSidebarExpanded && <span>Ajustar Tema</span>}
+            </div>
+            {isSidebarExpanded && (
+              <span className="text-[10px] text-slate-500 font-bold uppercase">{activeTheme.name}</span>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* Right Side Main Work Area */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        
+        {/* 1. Header Area bar (Unified & Compact) */}
+        <header className={`${activeTheme.headerBg} ${activeTheme.headerBorder} ${activeTheme.headerText} px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-4 sticky top-0 z-40 shrink-0 transition-colors duration-300 shadow-sm`}>
+          <div className="flex flex-col">
+            <h1 className="text-base font-extrabold tracking-tight">
+              {viewMode === 'day' ? 'Planificador Diario' : viewMode === 'week' ? 'Planificador Semanal' : viewMode === 'analysis' ? 'Análisis Estadístico e Histórico' : 'Módulo de Gestión de Personal'}
             </h1>
-            <p className={`text-[11px] ${activeTheme.headerSubtext}`}>
-              Panel interactivo de planificación | {activeMonthName} {currentYear} • {persons.length} Colaboradores
+            <p className={`text-[10px] ${activeTheme.headerSubtext}`}>
+              {activeMonthName} {currentYear} • {persons.length} Colaboradores
             </p>
           </div>
-        </div>
 
-        {/* Global actions: Auto balance and Reset */}
-        <div className="flex items-center gap-2">
-          {hasUnsavedChanges ? (
+          {/* Header Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {hasUnsavedChanges ? (
+              <button
+                onClick={handleManualSave}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 animate-pulse"
+                title="Guardar cambios pendientes en la base de datos de Supabase"
+              >
+                <Save size={13} className="text-white" />
+                <span>Guardar Cambios</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleManualSave}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs"
+                title="Planificación guardada y sincronizada"
+              >
+                <CheckCircle2 size={13} className="text-emerald-600" />
+                <span>Sincronizado</span>
+              </button>
+            )}
+
             <button
-              onClick={handleManualSave}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse"
-              title="Guardar cambios pendientes en la base de datos de Supabase"
+              onClick={handleSyncDemand}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50"
+              title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
             >
-              <Save size={14} className="text-white" />
-              <span>Guardar Planificación</span>
+              <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
             </button>
-          ) : (
+
             <button
-              onClick={handleManualSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs"
-              title="Planificación guardada y sincronizada"
+              onClick={() => setIsAttendanceModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+              title="Registrar Presentismo"
             >
-              <CheckCircle2 size={14} className="text-emerald-600" />
-              <span>Sincronizado</span>
+              <CheckCircle2 size={13} className="text-blue-100" />
+              <span>Presentismo</span>
             </button>
-          )}
 
-          <button
-            onClick={handleSyncDemand}
-            disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
-          >
-            <RefreshCw size={14} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
-          </button>
-
-          <button
-            onClick={() => setIsAttendanceModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-            title="Registrar Presentismo"
-          >
-            <CheckCircle2 size={14} className="text-blue-100" />
-            Presentismo
-          </button>
-
-          <button
-            onClick={() => setIsDemandModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-            title="Calculadora de Demanda"
-          >
-            <Clock size={14} className="text-orange-100" />
-            Demanda
-          </button>
-
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-            title="Importar turnos y empleados de una planilla Excel"
-          >
-            <FileSpreadsheet size={14} className="text-emerald-100" />
-            Importar Excel
-          </button>
-
-          <button
-            onClick={handleAutoBalanceCoverage}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer"
-            title="Asigna automáticamente personas libres a horas con déficit"
-          >
-            <Sparkles size={14} className="text-indigo-200 animate-pulse" />
-            Auto-Asignar Brechas ({activeArea})
-          </button>
-          
-          <button
-            onClick={handleCopyWeek}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
-            title="Copiar toda la programación de esta semana a la siguiente"
-          >
-            {/* Si no tenemos icono Copy, usamos RefreshCw temporalmente o Plus */}
-            <span className="font-bold">+</span>
-            Copiar Semana
-          </button>
-          
-          <button
-            onClick={handleResetData}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-705 active:scale-95 text-slate-300 border border-slate-700/50 rounded-lg cursor-pointer"
-            title="Restaurar base de datos nativa"
-          >
-            <RefreshCw size={13} />
-            Reajustar Valores
-          </button>
-        </div>
-      </header>
-
-      {/* Theme Selector Widget */}
-      <div className="px-6 pt-6">
-        <ThemeSelector activeThemeId={activeThemeId} onSelectTheme={handleSelectTheme} />
-      </div>
-
-      {/* 2. Interactive Month Date Navigator bar */}
-      <div className={`${activeTheme.cardBg} ${activeTheme.cardBorder} border-b py-3 px-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 transition-colors duration-300`}>
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Day / Week / Analysis View Switcher */}
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-xs">
             <button
-              onClick={() => setViewMode('day')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                viewMode === 'day'
-                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              onClick={() => setIsDemandModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+              title="Calculadora de Demanda"
             >
-              Vista Diaria
+              <Clock size={13} className="text-orange-100" />
+              <span>Calcular Demanda</span>
             </button>
-            <button
-              onClick={() => {
-                setViewMode('week');
-                const mondayDate = getWeekDates(activeDate)[0];
-                setActiveDate(mondayDate);
-              }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                viewMode === 'week'
-                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Semana Completa
-            </button>
-            <button
-              onClick={() => setViewMode('analysis')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                viewMode === 'analysis'
-                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Análisis de Turnera
-            </button>
-            <button
-              onClick={() => setViewMode('staff')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                viewMode === 'staff'
-                  ? 'bg-white text-indigo-600 shadow-xs border border-transparent'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Gestión de Personal
-            </button>
-          </div>
 
-          {viewMode !== 'analysis' && viewMode !== 'staff' && (
-            <>
-              <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+              title="Importar turnos y empleados de una planilla Excel"
+            >
+              <FileSpreadsheet size={13} className="text-emerald-100" />
+              <span>Importar Excel</span>
+            </button>
+
+            {viewMode !== 'analysis' && viewMode !== 'staff' && (
+              <>
                 <button
-              onClick={handlePrev}
-              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
-              title={viewMode === 'day' ? "Día Anterior" : "Semana Anterior"}
-            >
-              <ChevronLeft size={16} />
-              <span>{viewMode === 'day' ? 'Día' : 'Semana'} Ant.</span>
-            </button>
-            <span className="text-xs font-bold text-slate-600 font-sans px-2 select-none">
-              {viewMode === 'day' ? 'Navegación Diaria' : 'Navegación Semanal'}
-            </span>
+                  onClick={handleAutoBalanceCoverage}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-750 active:scale-95 transition-all text-white rounded-lg cursor-pointer"
+                  title="Asigna automáticamente personas libres a horas con déficit"
+                >
+                  <Sparkles size={13} className="text-indigo-200" />
+                  <span>Auto-Asignar ({activeArea})</span>
+                </button>
+                
+                <button
+                  onClick={handleCopyWeek}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                  title="Copiar toda la programación de esta semana a la siguiente"
+                >
+                  <span className="font-bold">+</span>
+                  <span>Copiar Semana</span>
+                </button>
+              </>
+            )}
+            
             <button
-              onClick={handleNext}
-              className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
-              title={viewMode === 'day' ? "Día Siguiente" : "Semana Siguiente"}
+              onClick={handleResetData}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-705 active:scale-95 text-slate-350 border border-slate-700/60 rounded-lg cursor-pointer"
+              title="Restaurar base de datos nativa"
             >
-              <span>{viewMode === 'day' ? 'Día' : 'Semana'} Sig.</span>
-              <ChevronRight size={16} />
+              <RefreshCw size={12} />
+              <span>Reajustar</span>
             </button>
           </div>
+        </header>
 
-          {/* Selector y Navegador de Mes Completo */}
-          <div className="flex items-center bg-slate-100 border border-slate-200 p-1 rounded-xl shadow-xs">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1 px-2 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
-              title="Mes Anterior"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            
-            <select
-              value={`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`}
-              onChange={(e) => {
-                const [yearStr, monthStr] = e.target.value.split('-');
-                const y = parseInt(yearStr, 10);
-                const m = parseInt(monthStr, 10) - 1;
-                const d = new Date(Date.UTC(y, m, 1));
-                const yyyy = d.getUTCFullYear();
-                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                const dd = String(d.getUTCDate()).padStart(2, '0');
-                setActiveDate(`${yyyy}-${mm}-${dd}`);
-              }}
-              className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/50 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans cursor-pointer mx-1.5"
-            >
-              {Array.from({ length: 12 }, (_, i) => {
-                const monthNames = [
-                  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-                ];
-                const monthVal = String(i + 1).padStart(2, '0');
+        {/* 2. Interactive Month Date Navigator bar */}
+        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+          <div className={`${activeTheme.cardBg} ${activeTheme.cardBorder} border-b py-2 px-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 transition-colors duration-300`}>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center bg-slate-100 border border-slate-200/80 p-1 rounded-xl shadow-xs">
+                <button
+                  onClick={handlePrev}
+                  className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                  title={viewMode === 'day' ? "Día Anterior" : "Semana Anterior"}
+                >
+                  <ChevronLeft size={14} />
+                  <span>{viewMode === 'day' ? 'Día' : 'Semana'} Ant.</span>
+                </button>
+                <span className="text-xs font-bold text-slate-600 font-sans px-2 select-none">
+                  {viewMode === 'day' ? 'Navegación Diaria' : 'Navegación Semanal'}
+                </span>
+                <button
+                  onClick={handleNext}
+                  className="p-1 px-2.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                  title={viewMode === 'day' ? "Día Siguiente" : "Semana Siguiente"}
+                >
+                  <span>{viewMode === 'day' ? 'Día' : 'Semana'} Sig.</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {/* Selector y Navegador de Mes Completo */}
+              <div className="flex items-center bg-slate-100 border border-slate-200/80 p-1 rounded-xl shadow-xs">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="p-1 px-2 text-slate-650 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
+                  title="Mes Anterior"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                
+                <select
+                  value={`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`}
+                  onChange={(e) => {
+                    const [yearStr, monthStr] = e.target.value.split('-');
+                    const y = parseInt(yearStr, 10);
+                    const m = parseInt(monthStr, 10) - 1;
+                    const d = new Date(Date.UTC(y, m, 1));
+                    const yyyy = d.getUTCFullYear();
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    setActiveDate(`${yyyy}-${mm}-${dd}`);
+                  }}
+                  className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/50 rounded-lg px-2 py-1 focus:outline-none font-sans cursor-pointer mx-1.5"
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const monthNames = [
+                      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+                    ];
+                    const monthVal = String(i + 1).padStart(2, '0');
+                    return (
+                      <option key={i} value={`${currentYear}-${monthVal}`}>
+                        {monthNames[i]} {currentYear}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="p-1 px-2 text-slate-605 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
+                  title="Mes Siguiente"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+            <span className="text-xs text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-3 py-1 rounded-lg hidden xl:inline font-medium">
+              💡 ¡Nuevo! Arrastra un turno y suéltalo en cualquier día del calendario para cambiar su día de asignación.
+            </span>
+          </div>
+        )}
+
+        {/* Calendar Days Horizon Carousel */}
+        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+          <div className="px-6 py-2 border-b border-slate-150 shrink-0 bg-white">
+            <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar">
+              {monthDays.map((day: CalendarDay) => {
+                const isSelected = viewMode === 'day'
+                  ? activeDate === day.dateString
+                  : getWeekDates(activeDate).includes(day.dateString);
+                
+                const isWeekFirstDay = viewMode === 'week' && day.dateString === getWeekDates(activeDate)[0];
+                const isDraggedOver = draggedOverDate === day.dateString;
+                
+                const isHoliday = !!FERIADOS_2026[day.dateString];
+
+                let buttonStyles = "bg-slate-50 border-slate-200/60 text-slate-650 hover:bg-slate-200 hover:border-slate-300";
+                if (isHoliday && !isSelected && !isDraggedOver) {
+                  buttonStyles = "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400";
+                }
+                if (isSelected) {
+                  if (viewMode === 'day' || isWeekFirstDay) {
+                    buttonStyles = isHoliday
+                      ? "bg-indigo-600 border-amber-400 text-white shadow-md ring-2 ring-amber-300/70 ring-offset-1 -translate-y-0.5 font-bold"
+                      : "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/80 -translate-y-0.5";
+                  } else {
+                    buttonStyles = isHoliday
+                      ? "bg-amber-50 border-amber-300 text-indigo-700 shadow-sm -translate-y-px font-bold ring-1 ring-amber-300"
+                      : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs -translate-y-px font-semibold";
+                  }
+                }
+                if (isDraggedOver) {
+                  buttonStyles = "bg-emerald-500 border-emerald-500 text-white scale-105 ring-2 ring-emerald-300 ring-offset-1 shadow-md shadow-emerald-100/90";
+                }
+
                 return (
-                  <option key={i} value={`${currentYear}-${monthVal}`}>
-                    {monthNames[i]} {currentYear}
-                  </option>
+                  <button
+                    key={day.dateString}
+                    data-active={isSelected}
+                    onClick={() => {
+                      if (viewMode === 'day') {
+                        setActiveDate(day.dateString);
+                      } else {
+                        const mondayOfClicked = getWeekDates(day.dateString)[0];
+                        setActiveDate(mondayOfClicked);
+                      }
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (draggedOverDate !== day.dateString) {
+                        setDraggedOverDate(day.dateString);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (draggedOverDate === day.dateString) {
+                        setDraggedOverDate(null);
+                      }
+                    }}
+                    onDrop={(e) => handleDropShiftOnDate(e, day.dateString)}
+                    title={FERIADOS_2026[day.dateString] ? `🎉 Feriado: ${FERIADOS_2026[day.dateString]}` : undefined}
+                    className={`flex flex-col items-center p-2 rounded-xl text-center min-w-[54px] border transition-all cursor-pointer ${buttonStyles}`}
+                  >
+                    <span className={`text-[10px] font-bold ${
+                      (viewMode === 'day' && isSelected) || isDraggedOver || isWeekFirstDay
+                        ? 'text-indigo-150' 
+                        : isSelected                     ? 'text-indigo-400' 
+                        : isHoliday
+                        ? 'text-amber-500'
+                        : 'text-slate-400'
+                    }`}>
+                      {day.label}
+                    </span>
+                    <span className="text-base font-extrabold tracking-tight font-sans">
+                      {day.dayNum}
+                    </span>
+                    {isHoliday && (
+                      <span className={`text-[8px] leading-tight font-bold mt-0.5 ${
+                        ((viewMode === 'day' && isSelected) || isWeekFirstDay) ? 'text-amber-300' : 'text-amber-500'
+                      }`}>🎉</span>
+                    )}
+                  </button>
                 );
               })}
-            </select>
+            </div>
+          </div>
+        )}
 
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1 px-2 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all cursor-pointer"
-              title="Mes Siguiente"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>          <span className="text-xs text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-3 py-1 rounded-lg hidden xl:inline font-medium animate-pulse">
-            💡 ¡Nuevo! Arrastra un turno y suéltalo en cualquier día del calendario para cambiar su día de asignación.
-          </span>
+        {/* 3. Main Operational Panels Container */}
+        <div className="flex flex-col lg:flex-row p-6 gap-6">
+          {viewMode === 'analysis' ? (
+            <div className="flex-1 min-h-[680px] lg:h-full w-full bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col animate-fade-in">
+              <div className="bg-slate-50 border-b border-slate-200/80 px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-slate-700 font-sans">Reporte Estadístico e Histórico Consolidador</span>
+                </div>
+                <a 
+                  href="./analisis_turnos.html" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+                >
+                  <span>Abrir en pestaña nueva ↗</span>
+                </a>
+              </div>
+              <iframe 
+                src="./analisis_turnos.html" 
+                className="flex-1 w-full h-full border-0" 
+                title="Análisis de Turnos"
+              />
+            </div>
+          ) : viewMode === 'staff' ? (
+            <StaffManagement
+              persons={persons}
+              areas={areas}
+              onAddPerson={() => {
+                setEditingPerson({
+                  id: 'p_new_' + Date.now(),
+                  name: '',
+                  area: areas[0] || 'Admision',
+                  maxDailyHours: 8,
+                  availabilityStart: 8,
+                  availabilityEnd: 17,
+                  color: 'indigo',
+                  possibleShifts: []
+                });
+                setIsPersonModalOpen(true);
+              }}
+              onEditPerson={(person) => {
+                setEditingPerson(person);
+                setIsPersonModalOpen(true);
+              }}
+              onDeletePerson={handleDeletePersonFromDb}
+              theme={activeTheme}
+            />
+          ) : (
+            <>
+              {/* Left column: People sidebar (Manage resources) - Colapsable */}
+              {showResourceSidebar ? (
+                <div className="w-full lg:w-[320px] shrink-0 flex flex-col relative transition-all duration-300 animate-slide-in">
+                  <PeopleSidebar
+                    persons={persons}
+                    shifts={shifts}
+                    selectedDate={activeDate}
+                    selectedArea={activeArea}
+                    onAddPerson={handleAddPerson}
+                    onQuickAddShift={handleQuickAddShift}
+                    onSelectPerson={(person) => {
+                      if (selectedPersonFilterId === person.id) {
+                        setSelectedPersonFilterId(null);
+                      } else {
+                        setSelectedPersonFilterId(person.id);
+                      }
+                    }}
+                    activeFilterPersonId={selectedPersonFilterId}
+                    onEditPerson={(person) => {
+                      setEditingPerson(person);
+                      setIsPersonModalOpen(true);
+                    }}
+                    onDeletePersons={handleDeletePersons}
+                    areas={activeAreasList}
+                    onAddArea={handleAddArea}
+                    onEditArea={handleEditArea}
+                    onDeleteArea={handleDeleteArea}
+                    theme={activeTheme}
+                  />
+                  {/* Collapse Resource Sidebar Button */}
+                  <button
+                    onClick={() => setShowResourceSidebar(false)}
+                    className="absolute top-4 right-2 p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-slate-500 hover:text-slate-800 transition-colors z-20 cursor-pointer shadow-xs"
+                    title="Ocultar lista de colaboradores"
+                  >
+                    <ChevronLeft size={13} />
+                  </button>
+                </div>
+              ) : (
+                /* Re-open Resource Sidebar Button */
+                <div className="w-12 shrink-0 flex flex-col items-center pt-2">
+                  <button
+                    onClick={() => setShowResourceSidebar(true)}
+                    className="p-3 bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 rounded-xl text-white shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    title="Mostrar lista de colaboradores"
+                  >
+                    <Users size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* Right column: Interactive scheduler sheet & coverage graph */}
+              <div className="flex-1 flex flex-col gap-6">
+                
+                {/* Areas Filtering tabs & Timeline controls */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-150 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <Layers size={15} className="text-slate-400" />
+                    <span className="text-xs font-bold text-slate-500 mr-2 uppercase">Filtrar Línea de Tiempo por:</span>
+                    <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/50">
+                      {['Todos', ...activeAreasList].map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => {
+                            setActiveTab(tab);
+                            if (tab !== 'Todos') {
+                              setActiveArea(tab); // sync area requirements focus
+                            }
+                          }}
+                          className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                            activeTab === tab
+                              ? 'bg-white text-slate-900 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          {tab === 'Administración' ? 'Admin' : tab}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Area Monitor Focus Selector (Active Coverage Chart Target Dept) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">Ver Cobertura de:</span>
+                    <select
+                      value={activeArea}
+                      onChange={(e) => {
+                        const val = e.target.value as Area;
+                        setActiveArea(val);
+                      }}
+                      className="text-xs font-bold border border-slate-250 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans cursor-pointer"
+                    >
+                      {activeAreasList.map((a) => (
+                        <option key={a} value={a}>
+                          {a === 'Atención' ? 'Atención (Especial)' : a}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        setModalShift(null);
+                        setPreselectedPersonId(undefined);
+                        setIsModalOpen(true);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 active:scale-95 transition-all rounded-lg cursor-pointer ml-1"
+                    >
+                      + Registrar Turno
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timeline chart wrapper */}
+                <div className="flex flex-col">
+                  <TimelineGrid
+                    persons={persons}
+                    shifts={shifts}
+                    activeArea={activeTab}
+                    selectedDate={activeDate}
+                    onUpdateShift={handleUpdateShift}
+                    onDeleteShift={handleDeleteShift}
+                    onAddShift={handleAddShift}
+                    onSelectShift={(shift) => {
+                      setModalShift(shift);
+                      setIsModalOpen(true);
+                    }}
+                    selectedPersonFilterId={selectedPersonFilterId}
+                    onClearPersonFilter={() => setSelectedPersonFilterId(null)}
+                    viewMode={viewMode}
+                    weekDates={getWeekDates(activeDate)}
+                    theme={activeTheme}
+                  />
+                </div>
+
+                {/* Bottom stats chart */}
+                <div className="shrink-0">
+                  <CoverageChart
+                    shifts={shifts}
+                    activeArea={activeArea}
+                    targetCount={activeTargetsObj.hourlyTargets}
+                    demand={demand}
+                    activeDate={activeDate}
+                    onUpdateTargets={(newTargets) => handleUpdateTargets(newTargets, activeArea)}
+                    theme={activeTheme}
+                    currentDayOfWeek={currentDayOfWeek}
+                    weekDates={getWeekDates(activeDate)}
+                    onChangeDate={setActiveDate}
+                    persons={persons}
+                    onQuickImport={(importedPersons, importedShifts) => {
+                      setPersons(importedPersons);
+                      setShifts(importedShifts);
+                      saveToLocalStorage(importedPersons, importedShifts, targets);
+                      setHasUnsavedChanges(true);
+                    }}
+                  />
+                </div>
+              </div>
             </>
           )}
         </div>
-        {/* Calendar Days Horizon Carousel */}
-        {viewMode !== 'analysis' && viewMode !== 'staff' && (
-          <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar px-1">
-          {monthDays.map((day: CalendarDay) => {
-            const isSelected = viewMode === 'day'
-              ? activeDate === day.dateString
-              : getWeekDates(activeDate).includes(day.dateString);
-            
-            const isWeekFirstDay = viewMode === 'week' && day.dateString === getWeekDates(activeDate)[0];
-            const isDraggedOver = draggedOverDate === day.dateString;
-            
-            const isHoliday = !!FERIADOS_2026[day.dateString];
-
-            let buttonStyles = "bg-slate-50 border-slate-200/60 text-slate-650 hover:bg-slate-200 hover:border-slate-300";
-            if (isHoliday && !isSelected && !isDraggedOver) {
-              buttonStyles = "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400";
-            }
-            if (isSelected) {
-              if (viewMode === 'day' || isWeekFirstDay) {
-                buttonStyles = isHoliday
-                  ? "bg-indigo-600 border-amber-400 text-white shadow-md ring-2 ring-amber-300/70 ring-offset-1 -translate-y-0.5 font-bold"
-                  : "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/80 -translate-y-0.5";
-              } else {
-                buttonStyles = isHoliday
-                  ? "bg-amber-50 border-amber-300 text-indigo-700 shadow-sm -translate-y-px font-bold ring-1 ring-amber-300"
-                  : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs -translate-y-px font-semibold";
-              }
-            }
-            if (isDraggedOver) {
-              buttonStyles = "bg-emerald-500 border-emerald-500 text-white scale-105 ring-2 ring-emerald-300 ring-offset-1 shadow-md shadow-emerald-100/90";
-            }
-
-            return (
-              <button
-                key={day.dateString}
-                data-active={isSelected}
-                onClick={() => {
-                  if (viewMode === 'day') {
-                    setActiveDate(day.dateString);
-                  } else {
-                    const mondayOfClicked = getWeekDates(day.dateString)[0];
-                    setActiveDate(mondayOfClicked);
-                  }
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (draggedOverDate !== day.dateString) {
-                    setDraggedOverDate(day.dateString);
-                  }
-                }}
-                onDragLeave={() => {
-                  if (draggedOverDate === day.dateString) {
-                    setDraggedOverDate(null);
-                  }
-                }}
-                onDrop={(e) => handleDropShiftOnDate(e, day.dateString)}
-                title={FERIADOS_2026[day.dateString] ? `🎉 Feriado: ${FERIADOS_2026[day.dateString]}` : undefined}
-                className={`flex flex-col items-center p-2 rounded-xl text-center min-w-[54px] border transition-all cursor-pointer ${buttonStyles}`}
-              >
-                <span className={`text-[10px] font-bold ${
-                  (viewMode === 'day' && isSelected) || isDraggedOver || isWeekFirstDay
-                    ? 'text-indigo-150' 
-                    : isSelected                     ? 'text-indigo-400' 
-                    : isHoliday
-                    ? 'text-amber-500'
-                    : 'text-slate-400'
-                }`}>
-                  {day.label}
-                </span>
-                <span className="text-base font-extrabold tracking-tight font-sans">
-                  {day.dayNum}
-                </span>
-                {isHoliday && (
-                  <span className={`text-[8px] leading-tight font-bold mt-0.5 ${
-                    ((viewMode === 'day' && isSelected) || isWeekFirstDay) ? 'text-amber-300' : 'text-amber-500'
-                  }`}>🎉</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        )}
-      </div>
-
-      {/* 3. Main Operational Panels Container */}
-      <div className="flex-1 flex flex-col lg:flex-row p-6 gap-6 overflow-hidden min-h-0">
-        {viewMode === 'analysis' ? (
-          <div className="flex-1 h-full w-full bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col animate-fade-in">
-            <div className="bg-slate-50 border-b border-slate-200/80 px-5 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-pulse" />
-                <span className="text-xs font-bold text-slate-700 font-sans">Reporte Estadístico e Histórico Consolidador</span>
-              </div>
-              <a 
-                href="./analisis_turnos.html" 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
-              >
-                <span>Abrir en pestaña nueva ↗</span>
-              </a>
-            </div>
-            <iframe 
-              src="./analisis_turnos.html" 
-              className="flex-1 w-full h-full border-0" 
-              title="Análisis de Turnos"
-            />
-          </div>
-        ) : viewMode === 'staff' ? (
-          <StaffManagement
-            persons={persons}
-            areas={areas}
-            onAddPerson={() => {
-              setEditingPerson({
-                id: 'p_new_' + Date.now(),
-                name: '',
-                area: areas[0] || 'Admision',
-                maxDailyHours: 8,
-                availabilityStart: 8,
-                availabilityEnd: 17,
-                color: 'indigo',
-                possibleShifts: []
-              });
-              setIsPersonModalOpen(true);
-            }}
-            onEditPerson={(person) => {
-              setEditingPerson(person);
-              setIsPersonModalOpen(true);
-            }}
-            onDeletePerson={handleDeletePersonFromDb}
-            theme={activeTheme}
-          />
-        ) : (
-          <>
-            {/* Left column: People sidebar (Manage resources) */}
-            <div className="w-full lg:w-[320px] h-[580px] lg:h-auto shrink-0 flex flex-col">
-              <PeopleSidebar
-                persons={persons}
-            shifts={shifts}
-            selectedDate={activeDate}
-            selectedArea={activeArea}
-            onAddPerson={handleAddPerson}
-            onQuickAddShift={handleQuickAddShift}
-            onSelectPerson={(person) => {
-              if (selectedPersonFilterId === person.id) {
-                setSelectedPersonFilterId(null);
-              } else {
-                setSelectedPersonFilterId(person.id);
-              }
-            }}
-            activeFilterPersonId={selectedPersonFilterId}
-            onEditPerson={(person) => {
-              setEditingPerson(person);
-              setIsPersonModalOpen(true);
-            }}
-            onDeletePersons={handleDeletePersons}
-            areas={activeAreasList}
-            onAddArea={handleAddArea}
-            onEditArea={handleEditArea}
-            onDeleteArea={handleDeleteArea}
-            theme={activeTheme}
-          />
-        </div>
-
-        {/* Right column: Interactive scheduler sheet & coverage graph */}
-        <div className="flex-1 flex flex-col gap-6 overflow-hidden min-h-0">
-          
-          {/* Areas Filtering tabs & Timeline controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-150 shadow-xs">
-            <div className="flex items-center gap-2">
-              <Layers size={15} className="text-slate-400" />
-              <span className="text-xs font-bold text-slate-500 mr-2 uppercase">Filtrar Línea de Tiempo por:</span>
-              <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/50">
-                {['Todos', ...activeAreasList].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      setActiveTab(tab);
-                      if (tab !== 'Todos') {
-                        setActiveArea(tab); // sync area requirements focus
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                      activeTab === tab
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {tab === 'Administración' ? 'Admin' : tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Area Monitor Focus Selector (Active Coverage Chart Target Dept) */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500">Ver Cobertura de:</span>
-              <select
-                value={activeArea}
-                onChange={(e) => {
-                  const val = e.target.value as Area;
-                  setActiveArea(val);
-                }}
-                className="text-xs font-bold border border-slate-250 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                {activeAreasList.map((a) => (
-                  <option key={a} value={a}>
-                    {a === 'Atención' ? 'Atención (Especial)' : a}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={() => {
-                  setModalShift(null);
-                  setPreselectedPersonId(undefined);
-                  setIsModalOpen(true);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 active:scale-95 transition-all rounded-lg cursor-pointer ml-1"
-              >
-                + Registrar Turno
-              </button>
-            </div>
-          </div>
-
-          {/* Timeline chart wrapper */}
-          <div className="flex-1 min-h-0 flex flex-col">
-            <TimelineGrid
-              persons={persons}
-              shifts={shifts}
-              activeArea={activeTab}
-              selectedDate={activeDate}
-              onUpdateShift={handleUpdateShift}
-              onDeleteShift={handleDeleteShift}
-              onAddShift={handleAddShift}
-              onSelectShift={(shift) => {
-                setModalShift(shift);
-                setIsModalOpen(true);
-              }}
-              selectedPersonFilterId={selectedPersonFilterId}
-              onClearPersonFilter={() => setSelectedPersonFilterId(null)}
-              viewMode={viewMode}
-              weekDates={getWeekDates(activeDate)}
-              theme={activeTheme}
-            />
-          </div>
-
-          {/* Bottom stats chart */}
-          <div className="shrink-0">
-            <CoverageChart
-              shifts={shifts}
-              activeArea="Admision"
-              targetCount={admisionTargetsObj.hourlyTargets}
-              demand={demand}
-              activeDate={activeDate}
-              onUpdateTargets={(newTargets) => handleUpdateTargets(newTargets, 'Admision')}
-              theme={activeTheme}
-              currentDayOfWeek={currentDayOfWeek}
-              weekDates={getWeekDates(activeDate)}
-              onChangeDate={setActiveDate}
-              persons={persons}
-              onQuickImport={(importedPersons, importedShifts) => {
-                setPersons(importedPersons);
-                setShifts(importedShifts);
-                saveToLocalStorage(importedPersons, importedShifts, targets);
-                setHasUnsavedChanges(true);
-              }}
-            />
-          </div>
-        </div>
-          </>
-        )}
       </div>
 
       {/* Modals & Popups */}
@@ -1475,6 +1563,14 @@ export default function App() {
         onSave={handleSavePerson}
         onDelete={handleDeletePersonFromDb}
         areas={activeAreasList}
+      />
+
+      {/* Theme Settings Popover */}
+      <ThemeSelectorPopover
+        activeThemeId={activeThemeId}
+        onSelectTheme={handleSelectTheme}
+        isOpen={isThemePopoverOpen}
+        onClose={() => setIsThemePopoverOpen(false)}
       />
     </div>
   );
