@@ -1293,24 +1293,26 @@ export default function App() {
         {/* 3. Main Operational Panels Container */}
         <div className="flex flex-col lg:flex-row p-6 gap-6">
           {viewMode === 'analysis' ? (
-            <div className="flex-1 min-h-[680px] lg:h-full w-full bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col animate-fade-in">
-              <div className="bg-slate-50 border-b border-slate-200/80 px-5 py-3 flex items-center justify-between">
+            <div className={`flex-1 w-full ${activeTheme.cardBg} rounded-2xl border ${activeTheme.cardBorder} shadow-md flex flex-col animate-fade-in`}>
+              <div className={`border-b ${activeTheme.cardHeaderBorder || activeTheme.cardBorder} ${activeTheme.cardHeaderBg || ''} rounded-t-2xl px-5 py-3 flex items-center justify-between`}>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-pulse" />
-                  <span className="text-xs font-bold text-slate-700 font-sans">Reporte Estadístico e Histórico Consolidador</span>
+                  <span className={`text-xs font-bold ${activeTheme.cardText} font-sans`}>Reporte Estadístico e Histórico Consolidador</span>
                 </div>
                 <a 
-                  href="./analisis_turnos.html" 
+                  href={`./analisis_turnos.html?theme=${activeThemeId}`} 
                   target="_blank" 
                   rel="noreferrer"
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+                  className={`text-[11px] font-bold ${activeTheme.themeHighlightText} hover:opacity-80 flex items-center gap-1 transition-colors`}
                 >
                   <span>Abrir en pestaña nueva ↗</span>
                 </a>
               </div>
               <iframe 
-                src="./analisis_turnos.html" 
-                className="flex-1 w-full h-full border-0" 
+                src={`./analisis_turnos.html?theme=${activeThemeId}`} 
+                className="w-full border-0 rounded-b-2xl" 
+                style={{ height: '1700px' }}
+                scrolling="no"
                 title="Análisis de Turnos"
               />
             </div>

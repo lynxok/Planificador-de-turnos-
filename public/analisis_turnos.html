@@ -202,6 +202,262 @@
                 display: none !important;
             }
         }
+
+        /* ---------------------------------------------------- */
+        /* Themes Definitions */
+        /* ---------------------------------------------------- */
+        
+        /* 1. minimal (Light) */
+        body.theme-minimal {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-color: #4f46e5;
+            --accent-hover: #4338ca;
+            --accent-bg: rgba(79, 70, 229, 0.75);
+            --chart-grid: rgba(0, 0, 0, 0.05);
+            --select-bg: #ffffff;
+            --select-color: #0f172a;
+        }
+        body.theme-minimal .stat-value {
+            background: linear-gradient(to right, #0f172a, #334155) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal .filter-select {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal .filter-select option {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal #loadingOverlay {
+            background: #f8fafc !important;
+        }
+        body.theme-minimal #loadingOverlay h5,
+        body.theme-minimal #loadingOverlay p {
+            color: #0f172a !important;
+        }
+
+        /* 2. cyberpunk */
+        body.theme-cyberpunk {
+            --bg-gradient: linear-gradient(135deg, #0a0712 0%, #120a21 100%);
+            --card-bg: rgba(21, 15, 43, 0.85);
+            --card-border: rgba(254, 1, 154, 0.4);
+            --text-main: #00ffff;
+            --text-muted: #8c82b5;
+            --accent-color: #fe019a;
+            --accent-hover: #ff1baf;
+            --accent-bg: rgba(254, 1, 154, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #150f2b;
+            --select-color: #00ffff;
+        }
+        body.theme-cyberpunk .stat-value {
+            background: linear-gradient(to right, #00ffff, #ffffff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00ffff !important;
+        }
+
+        /* 3. matrix */
+        body.theme-matrix {
+            --bg-gradient: linear-gradient(135deg, #000000 0%, #020a03 100%);
+            --card-bg: rgba(2, 10, 3, 0.9);
+            --card-border: rgba(0, 255, 65, 0.4);
+            --text-main: #00ff41;
+            --text-muted: #00aa2a;
+            --accent-color: #00ff41;
+            --accent-hover: #33ff67;
+            --accent-bg: rgba(0, 255, 65, 0.75);
+            --chart-grid: rgba(0, 255, 65, 0.1);
+            --select-bg: #020a03;
+            --select-color: #00ff41;
+        }
+        body.theme-matrix .stat-value {
+            background: linear-gradient(to right, #00ff41, #33ff67) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00ff41 !important;
+            font-family: monospace;
+        }
+
+        /* 4. deep-ocean */
+        body.theme-deep-ocean {
+            --bg-gradient: linear-gradient(135deg, #021526 0%, #032541 100%);
+            --card-bg: rgba(3, 42, 69, 0.85);
+            --card-border: rgba(2, 132, 199, 0.4);
+            --text-main: #e0f2fe;
+            --text-muted: #7dd3fc;
+            --accent-color: #38bdf8;
+            --accent-hover: #0284c7;
+            --accent-bg: rgba(56, 189, 248, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #032a45;
+            --select-color: #e0f2fe;
+        }
+        body.theme-deep-ocean .stat-value {
+            background: linear-gradient(to right, #38bdf8, #ffffff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #e0f2fe !important;
+        }
+
+        /* 5. harry-potter */
+        body.theme-harry-potter {
+            --bg-gradient: linear-gradient(135deg, #150e0e 0%, #271515 100%);
+            --card-bg: rgba(30, 20, 20, 0.85);
+            --card-border: rgba(140, 103, 35, 0.4);
+            --text-main: #ffeedb;
+            --text-muted: #cfa470;
+            --accent-color: #d4af37;
+            --accent-hover: #b8860b;
+            --accent-bg: rgba(212, 175, 55, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1e1414;
+            --select-color: #ffeedb;
+        }
+        body.theme-harry-potter .stat-value {
+            background: linear-gradient(to right, #d4af37, #ffdd66) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffeedb !important;
+        }
+
+        /* 6. marvel */
+        body.theme-marvel {
+            --bg-gradient: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            --card-bg: rgba(28, 28, 28, 0.85);
+            --card-border: rgba(237, 29, 36, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --accent-color: #ed1d24;
+            --accent-hover: #c41419;
+            --accent-bg: rgba(237, 29, 36, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1c1c1c;
+            --select-color: #ffffff;
+        }
+        body.theme-marvel .stat-value {
+            background: linear-gradient(to right, #ffffff, #aaaaaa) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffffff !important;
+        }
+
+        /* 7. loki */
+        body.theme-loki {
+            --bg-gradient: linear-gradient(135deg, #181512 0%, #29221c 100%);
+            --card-bg: rgba(34, 27, 22, 0.85);
+            --card-border: rgba(212, 137, 68, 0.4);
+            --text-main: #fceeda;
+            --text-muted: #c6a386;
+            --accent-color: #ec9e59;
+            --accent-hover: #d48944;
+            --accent-bg: rgba(236, 158, 89, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #221b16;
+            --select-color: #fceeda;
+        }
+        body.theme-loki .stat-value {
+            background: linear-gradient(to right, #ec9e59, #ffddaa) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #fceeda !important;
+        }
+
+        /* 8. winamp */
+        body.theme-winamp {
+            --bg-gradient: linear-gradient(135deg, #1a1c22 0%, #0e1014 100%);
+            --card-bg: rgba(33, 36, 45, 0.85);
+            --card-border: rgba(74, 85, 104, 0.5);
+            --text-main: #00e1ff;
+            --text-muted: #888e99;
+            --accent-color: #33ff33;
+            --accent-hover: #00e1ff;
+            --accent-bg: rgba(51, 255, 51, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #21242d;
+            --select-color: #00e1ff;
+        }
+        body.theme-winamp .stat-value {
+            background: linear-gradient(to right, #33ff33, #00e1ff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00e1ff !important;
+        }
+
+        /* 9. vichy */
+        body.theme-vichy {
+            --bg-gradient: linear-gradient(135deg, #0d0f0f 0%, #161919 100%);
+            --card-bg: rgba(22, 25, 25, 0.85);
+            --card-border: rgba(5, 173, 152, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #BBBFBF;
+            --accent-color: #05AD98;
+            --accent-hover: #048c7a;
+            --accent-bg: rgba(5, 173, 152, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #161919;
+            --select-color: #ffffff;
+        }
+        body.theme-vichy .stat-value {
+            background: linear-gradient(to right, #ffffff, #05AD98) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffffff !important;
+        }
+
+        /* 10. sorbet */
+        body.theme-sorbet {
+            --bg-gradient: linear-gradient(135deg, #141512 0%, #1f211d 100%);
+            --card-bg: rgba(31, 33, 29, 0.85);
+            --card-border: rgba(183, 195, 150, 0.4);
+            --text-main: #FEFEFE;
+            --text-muted: #CCCCCC;
+            --accent-color: #B7C396;
+            --accent-hover: #a1ad80;
+            --accent-bg: rgba(183, 195, 150, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1f211d;
+            --select-color: #FEFEFE;
+        }
+        body.theme-sorbet .stat-value {
+            background: linear-gradient(to right, #FEFEFE, #B7C396) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #FEFEFE !important;
+        }
+
+        /* 11. frozen-mist */
+        body.theme-frozen-mist {
+            --bg-gradient: linear-gradient(135deg, #151614 0%, #21221f 100%);
+            --card-bg: rgba(33, 34, 31, 0.85);
+            --card-border: rgba(221, 112, 11, 0.4);
+            --text-main: #FCF8D8;
+            --text-muted: #ADACA7;
+            --accent-color: #DD700B;
+            --accent-hover: #b85c07;
+            --accent-bg: rgba(221, 112, 11, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #21221f;
+            --select-color: #FCF8D8;
+        }
+        body.theme-frozen-mist .stat-value {
+            background: linear-gradient(to right, #FCF8D8, #DD700B) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #FCF8D8 !important;
+        }
+        
+        #loadingOverlay {
+            background: var(--bg-gradient) !important;
+        }
     </style>
 </head>
 <body>
@@ -381,10 +637,24 @@
         let asistenciaChartInst = null;
         let tipoConsultaChartInst = null;
 
-        // Chart.js dark theme configuration defaults
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
-        Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+        // Detect and apply theme dynamically before running anything
+        function applyTheme() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTheme = urlParams.get('theme') || localStorage.getItem('cov_active_theme') || 'minimal';
+            
+            document.body.className = '';
+            document.body.classList.add('theme-' + activeTheme);
+            
+            // Adjust Chart.js defaults dynamically based on CSS variables of active theme
+            const style = getComputedStyle(document.body);
+            const textMuted = style.getPropertyValue('--text-muted').trim() || '#94a3b8';
+            const cardBorder = style.getPropertyValue('--card-border').trim() || 'rgba(255, 255, 255, 0.08)';
+            
+            Chart.defaults.color = textMuted;
+            Chart.defaults.borderColor = cardBorder;
+            Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+        }
+        applyTheme();
 
         async function init() {
             try {
@@ -544,7 +814,15 @@
                 return { label: k, count: diasCounts[k], sortKey: sortKey };
             }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
-            const horasCounts = countFrequencies(filteredData, 'HoraLimpia');
+            // Group by hour instead of specific minutes
+            const horasCounts = {};
+            filteredData.forEach(item => {
+                const horaLimpia = item.HoraLimpia || "00:00";
+                const hour = horaLimpia.split(':')[0] || "00";
+                const label = hour.padStart(2, '0') + ":00";
+                horasCounts[label] = (horasCounts[label] || 0) + 1;
+            });
+
             const horasArr = Object.keys(horasCounts).map(k => {
                 return { label: k, count: horasCounts[k] };
             }).sort((a, b) => {
@@ -561,6 +839,11 @@
             
             const asistenciaArr = getSortedTop(asistenciaCounts);
 
+            const style = getComputedStyle(document.body);
+            const accentColor = style.getPropertyValue('--accent-color').trim() || '#6366f1';
+            const accentBg = style.getPropertyValue('--accent-bg').trim() || 'rgba(99, 102, 241, 0.75)';
+            const chartGrid = style.getPropertyValue('--chart-grid').trim() || 'rgba(255, 255, 255, 0.05)';
+
             // 1. Doctors Chart
             if (medicosChartInst) medicosChartInst.destroy();
             medicosChartInst = new Chart(document.getElementById('medicosChart'), {
@@ -570,8 +853,8 @@
                     datasets: [{
                         label: 'Pacientes',
                         data: medicosArr.map(x => x.count),
-                        backgroundColor: 'rgba(99, 102, 241, 0.75)',
-                        borderColor: '#6366f1',
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
                         borderWidth: 1
                     }]
                 },
@@ -583,7 +866,7 @@
                         legend: { display: false } 
                     },
                     scales: {
-                        x: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        x: { grid: { color: chartGrid } },
                         y: { 
                             grid: { display: false },
                             ticks: { autoSkip: false, font: { size: 9 } } 
@@ -601,8 +884,8 @@
                     datasets: [{
                         label: 'Pacientes',
                         data: coberturasArr.map(x => x.count),
-                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
-                        borderColor: '#10b981',
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
                         borderWidth: 1
                     }]
                 },
@@ -614,7 +897,7 @@
                         legend: { display: false } 
                     },
                     scales: {
-                        x: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        x: { grid: { color: chartGrid } },
                         y: { 
                             grid: { display: false },
                             ticks: { autoSkip: false, font: { size: 9 } } 
@@ -632,8 +915,8 @@
                     datasets: [{
                         label: 'Pacientes por Día',
                         data: diasArr.map(x => x.count),
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        borderColor: '#6366f1',
+                        backgroundColor: accentBg.replace('0.75', '0.1').replace('0.9', '0.1'),
+                        borderColor: accentColor,
                         borderWidth: 2,
                         fill: true,
                         tension: 0.25,
@@ -646,7 +929,7 @@
                     maintainAspectRatio: false,
                     scales: {
                         x: { grid: { display: false }, ticks: { font: { size: 8 } } },
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                        y: { grid: { color: chartGrid } }
                     }
                 }
             });
@@ -660,8 +943,8 @@
                     datasets: [{
                         label: 'Citas por Hora',
                         data: horasArr.map(x => x.count),
-                        backgroundColor: 'rgba(245, 158, 11, 0.75)',
-                        borderColor: '#f59e0b',
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
                         borderWidth: 1
                     }]
                 },
@@ -670,7 +953,7 @@
                     maintainAspectRatio: false,
                     scales: {
                         x: { grid: { display: false } },
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                        y: { grid: { color: chartGrid } }
                     }
                 }
             });

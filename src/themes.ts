@@ -565,5 +565,194 @@ export const THEMES: AppTheme[] = [
         handle: 'bg-[#ff3333]'
       }
     }
+  },
+  {
+    id: 'vichy',
+    name: 'Vichy',
+    description: 'Teal and silver gray',
+    emoji: '💎',
+    fontClass: 'font-sans',
+    bg: 'bg-[#0d0f0f]',
+    textPrimary: 'text-white',
+    textSecondary: 'text-[#05AD98]',
+    headerBg: 'bg-[#161919]',
+    headerBorder: 'border-b border-[#05AD98]/60 shadow-md',
+    headerText: 'text-white font-bold',
+    headerSubtext: 'text-[#05AD98]',
+    btnPrimaryBg: 'bg-[#05AD98] hover:bg-[#048c7a]',
+    btnPrimaryHover: 'hover:bg-[#048c7a]',
+    btnPrimaryText: 'text-white font-semibold',
+    btnPrimaryBorder: 'border border-[#BBBFBF]/30',
+    btnSecondaryBg: 'bg-[#1a201f]',
+    btnSecondaryHover: 'hover:bg-[#252e2c]',
+    btnSecondaryText: 'text-[#BBBFBF]',
+    btnSecondaryBorder: 'border border-[#05AD98]/40',
+    cardBg: 'bg-[#161919]',
+    cardBorder: 'border border-[#05AD98]/20 shadow-[0_4px_16px_rgba(5,173,152,0.1)]',
+    cardText: 'text-white',
+    cardTextMuted: 'text-[#BBBFBF]',
+    cardHeaderBg: 'bg-[#1c2121]',
+    cardHeaderBorder: 'border-b border-[#05AD98]/30',
+    timelineBg: 'bg-[#0d0f0f]',
+    timelineHeaderBg: 'bg-[#161919]',
+    timelineHeaderBorder: 'border-[#05AD98]/45',
+    timelineHeaderText: 'text-white font-semibold',
+    timelineCellBorder: 'border-[#05AD98]/15',
+    timelineIndicatorBg: 'bg-[#05AD98]/15',
+    timelineDragOverBg: 'bg-[#05AD98]/25 border-r-[#05AD98]',
+    timelineRowHover: 'hover:bg-[#05AD98]/10',
+    themeHighlightText: 'text-[#05AD98]',
+    areaColors: {
+      'Atención': {
+        bg: 'bg-[#05AD98] text-white border-[#05AD98]',
+        ring: 'focus:ring-[#05AD98] border-[#048c7a]',
+        text: 'text-slate-100',
+        handle: 'bg-white'
+      },
+      'Soporte': {
+        bg: 'bg-[#1e4640] text-white border-[#05AD98]',
+        ring: 'focus:ring-teal-400 border-teal-800',
+        text: 'text-teal-200',
+        handle: 'bg-[#05AD98]'
+      },
+      'Ventas': {
+        bg: 'bg-[#122e2a] text-[#BBBFBF] border-[#05AD98]/50',
+        ring: 'focus:ring-teal-500 border-teal-900',
+        text: 'text-[#BBBFBF]',
+        handle: 'bg-[#BBBFBF]'
+      },
+      'Administración': {
+        bg: 'bg-white text-[#0d0f0f] border-[#05AD98] font-bold',
+        ring: 'focus:ring-[#05AD98] border-black',
+        text: 'text-[#0d0f0f]',
+        handle: 'bg-[#0d0f0f]'
+      }
+    }
+  },
+  {
+    id: 'sorbet',
+    name: 'Sorbet',
+    description: 'Sage and warm mauve',
+    emoji: '🍧',
+    fontClass: 'font-sans',
+    bg: 'bg-[#141512]',
+    textPrimary: 'text-[#FEFEFE]',
+    textSecondary: 'text-[#B7C396]',
+    headerBg: 'bg-[#1f211d]',
+    headerBorder: 'border-b border-[#B7C396]/60 shadow-md',
+    headerText: 'text-[#FEFEFE] font-bold',
+    headerSubtext: 'text-[#BA9A91]',
+    btnPrimaryBg: 'bg-[#B7C396] hover:bg-[#a1ad80]',
+    btnPrimaryHover: 'hover:bg-[#a1ad80]',
+    btnPrimaryText: 'text-slate-900 font-bold',
+    btnPrimaryBorder: 'border border-[#EDECEC]/30',
+    btnSecondaryBg: 'bg-[#21231f]',
+    btnSecondaryHover: 'hover:bg-[#2d302a]',
+    btnSecondaryText: 'text-[#BA9A91]',
+    btnSecondaryBorder: 'border border-[#B7C396]/45',
+    cardBg: 'bg-[#1f211d]',
+    cardBorder: 'border border-[#B7C396]/20 shadow-[0_4px_16px_rgba(183,195,150,0.1)]',
+    cardText: 'text-[#EDECEC]',
+    cardTextMuted: 'text-[#CCCCCC]',
+    cardHeaderBg: 'bg-[#282a25]',
+    cardHeaderBorder: 'border-b border-[#B7C396]/30',
+    timelineBg: 'bg-[#141512]',
+    timelineHeaderBg: 'bg-[#1f211d]',
+    timelineHeaderBorder: 'border-[#B7C396]/45',
+    timelineHeaderText: 'text-[#FEFEFE] font-semibold',
+    timelineCellBorder: 'border-[#B7C396]/15',
+    timelineIndicatorBg: 'bg-[#B7C396]/15',
+    timelineDragOverBg: 'bg-[#B7C396]/25 border-r-[#B7C396]',
+    timelineRowHover: 'hover:bg-[#B7C396]/10',
+    themeHighlightText: 'text-[#B7C396]',
+    areaColors: {
+      'Atención': {
+        bg: 'bg-[#B7C396] text-slate-900 border-[#B7C396] font-bold',
+        ring: 'focus:ring-[#B7C396] border-[#a1ad80]',
+        text: 'text-slate-800',
+        handle: 'bg-slate-900'
+      },
+      'Soporte': {
+        bg: 'bg-[#BA9A91] text-white border-[#BA9A91] font-bold',
+        ring: 'focus:ring-[#BA9A91] border-[#a38077]',
+        text: 'text-slate-100',
+        handle: 'bg-white'
+      },
+      'Ventas': {
+        bg: 'bg-[#383b32] text-[#B7C396] border-[#B7C396]/55',
+        ring: 'focus:ring-green-400 border-green-800',
+        text: 'text-[#B7C396]',
+        handle: 'bg-[#B7C396]'
+      },
+      'Administración': {
+        bg: 'bg-[#EDECEC] text-slate-900 border-[#CCCCCC] font-bold',
+        ring: 'focus:ring-white border-[#CCCCCC]',
+        text: 'text-slate-900',
+        handle: 'bg-slate-900'
+      }
+    }
+  },
+  {
+    id: 'frozen-mist',
+    name: 'Frozen Mist',
+    description: 'Vivid orange and olive',
+    emoji: '❄️',
+    fontClass: 'font-sans',
+    bg: 'bg-[#151614]',
+    textPrimary: 'text-[#FCF8D8]',
+    textSecondary: 'text-[#DD700B]',
+    headerBg: 'bg-[#21221f]',
+    headerBorder: 'border-b border-[#DD700B]/60 shadow-md',
+    headerText: 'text-[#FCF8D8] font-bold',
+    headerSubtext: 'text-[#D9DADF]',
+    btnPrimaryBg: 'bg-[#DD700B] hover:bg-[#b85c07]',
+    btnPrimaryHover: 'hover:bg-[#b85c07]',
+    btnPrimaryText: 'text-white font-bold',
+    btnPrimaryBorder: 'border border-[#ADACA7]/30',
+    btnSecondaryBg: 'bg-[#1f211f]',
+    btnSecondaryHover: 'hover:bg-[#2b2e2b]',
+    btnSecondaryText: 'text-[#D9DADF]',
+    btnSecondaryBorder: 'border border-[#DD700B]/45',
+    cardBg: 'bg-[#21221f]',
+    cardBorder: 'border border-[#DD700B]/20 shadow-[0_4px_16px_rgba(221,112,11,0.1)]',
+    cardText: 'text-[#FCF8D8]',
+    cardTextMuted: 'text-[#ADACA7]',
+    cardHeaderBg: 'bg-[#2d2f2b]',
+    cardHeaderBorder: 'border-b border-[#DD700B]/30',
+    timelineBg: 'bg-[#151614]',
+    timelineHeaderBg: 'bg-[#21221f]',
+    timelineHeaderBorder: 'border-[#DD700B]/45',
+    timelineHeaderText: 'text-[#FCF8D8] font-semibold',
+    timelineCellBorder: 'border-[#DD700B]/15',
+    timelineIndicatorBg: 'bg-[#DD700B]/15',
+    timelineDragOverBg: 'bg-[#DD700B]/25 border-r-[#DD700B]',
+    timelineRowHover: 'hover:bg-[#DD700B]/10',
+    themeHighlightText: 'text-[#DD700B]',
+    areaColors: {
+      'Atención': {
+        bg: 'bg-[#DD700B] text-white border-[#DD700B] font-bold',
+        ring: 'focus:ring-[#DD700B] border-[#b85c07]',
+        text: 'text-slate-100',
+        handle: 'bg-white'
+      },
+      'Soporte': {
+        bg: 'bg-[#7C7D75] text-[#FCF8D8] border-[#7C7D75] font-bold',
+        ring: 'focus:ring-[#7C7D75] border-[#5e5f59]',
+        text: 'text-[#FCF8D8]',
+        handle: 'bg-[#FCF8D8]'
+      },
+      'Ventas': {
+        bg: 'bg-[#2d302d] text-[#DD700B] border-[#DD700B]/55',
+        ring: 'focus:ring-orange-400 border-orange-850',
+        text: 'text-[#DD700B]',
+        handle: 'bg-[#DD700B]'
+      },
+      'Administración': {
+        bg: 'bg-[#D9DADF] text-slate-900 border-[#ADACA7] font-bold',
+        ring: 'focus:ring-white border-[#ADACA7]',
+        text: 'text-slate-900',
+        handle: 'bg-slate-900'
+      }
+    }
   }
 ];
