@@ -31,6 +31,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
+// Serve static files from the dist directory in production
+app.use(express.static(path.resolve(__dirname, '../dist')));
+
 // In-Memory cache variables
 let personsCache: any[] = [];
 let shiftsCache: any[] = [];
@@ -514,6 +517,11 @@ app.post('/api/sync-demand', async (req, res) => {
 
 app.get('/api/appointments-summary', (req, res) => {
   res.json(appointmentsSummaryCache);
+});
+
+// Fallback route to serve index.html for SPA routing (must be placed after all API endpoints)
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../dist/index.html'));
 });
 
 const PORT = 3021;
