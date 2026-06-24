@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Turnera - ITEO</title>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="bootstrap.min.css" rel="stylesheet">
+    <script src="chart.umd.js"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e1b4b 100%);
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            min-height: 100vh;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.5);
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.08), 0 10px 10px -6px rgba(99, 102, 241, 0.08);
+        }
+
+        .card-header-premium {
+            background: rgba(15, 23, 42, 0.4);
+            border-bottom: 1px solid var(--card-border);
+            padding: 12px 18px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .filter-select {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            font-size: 0.78rem;
+            font-weight: 500;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-select:focus {
+            background-color: rgba(15, 23, 42, 0.95);
+            color: var(--text-main);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+        }
+
+        .filter-select option {
+            background-color: #0f172a;
+            color: var(--text-main);
+        }
+
+        /* Overlay de Carga */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #090d16;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .spinner-custom {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(99, 102, 241, 0.15);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Ajustes de Gráficos */
+        .chart-container-box {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            padding: 8px;
+        }
+
+        .chart-container-box-large {
+            position: relative;
+            height: 500px;
+            width: 100%;
+            padding: 8px;
+        }
+
+        .btn-reporte {
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+            border: none;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 8px 18px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-reporte:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+            color: #ffffff;
+        }
+
+        .btn-reporte:active {
+            transform: translateY(1px);
+        }
+
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .glass-card {
+                background: white !important;
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                color: black !important;
+            }
+            .stat-value {
+                background: none !important;
+                -webkit-text-fill-color: black !important;
+                color: black !important;
+            }
+            .d-print-none {
+                display: none !important;
+            }
+        }
+
+        /* ---------------------------------------------------- */
+        /* Themes Definitions */
+        /* ---------------------------------------------------- */
+        
+        /* 1. minimal (Light) */
+        body.theme-minimal {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-color: #4f46e5;
+            --accent-hover: #4338ca;
+            --accent-bg: rgba(79, 70, 229, 0.75);
+            --chart-grid: rgba(0, 0, 0, 0.05);
+            --select-bg: #ffffff;
+            --select-color: #0f172a;
+        }
+        body.theme-minimal .stat-value {
+            background: linear-gradient(to right, #0f172a, #334155) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal .filter-select {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal .filter-select option {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        body.theme-minimal #loadingOverlay {
+            background: #f8fafc !important;
+        }
+        body.theme-minimal #loadingOverlay h5,
+        body.theme-minimal #loadingOverlay p {
+            color: #0f172a !important;
+        }
+
+        /* 2. cyberpunk */
+        body.theme-cyberpunk {
+            --bg-gradient: linear-gradient(135deg, #0a0712 0%, #120a21 100%);
+            --card-bg: rgba(21, 15, 43, 0.85);
+            --card-border: rgba(254, 1, 154, 0.4);
+            --text-main: #00ffff;
+            --text-muted: #8c82b5;
+            --accent-color: #fe019a;
+            --accent-hover: #ff1baf;
+            --accent-bg: rgba(254, 1, 154, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #150f2b;
+            --select-color: #00ffff;
+        }
+        body.theme-cyberpunk .stat-value {
+            background: linear-gradient(to right, #00ffff, #ffffff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00ffff !important;
+        }
+
+        /* 3. matrix */
+        body.theme-matrix {
+            --bg-gradient: linear-gradient(135deg, #000000 0%, #020a03 100%);
+            --card-bg: rgba(2, 10, 3, 0.9);
+            --card-border: rgba(0, 255, 65, 0.4);
+            --text-main: #00ff41;
+            --text-muted: #00aa2a;
+            --accent-color: #00ff41;
+            --accent-hover: #33ff67;
+            --accent-bg: rgba(0, 255, 65, 0.75);
+            --chart-grid: rgba(0, 255, 65, 0.1);
+            --select-bg: #020a03;
+            --select-color: #00ff41;
+        }
+        body.theme-matrix .stat-value {
+            background: linear-gradient(to right, #00ff41, #33ff67) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00ff41 !important;
+            font-family: monospace;
+        }
+
+        /* 4. deep-ocean */
+        body.theme-deep-ocean {
+            --bg-gradient: linear-gradient(135deg, #021526 0%, #032541 100%);
+            --card-bg: rgba(3, 42, 69, 0.85);
+            --card-border: rgba(2, 132, 199, 0.4);
+            --text-main: #e0f2fe;
+            --text-muted: #7dd3fc;
+            --accent-color: #38bdf8;
+            --accent-hover: #0284c7;
+            --accent-bg: rgba(56, 189, 248, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #032a45;
+            --select-color: #e0f2fe;
+        }
+        body.theme-deep-ocean .stat-value {
+            background: linear-gradient(to right, #38bdf8, #ffffff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #e0f2fe !important;
+        }
+
+        /* 5. harry-potter */
+        body.theme-harry-potter {
+            --bg-gradient: linear-gradient(135deg, #150e0e 0%, #271515 100%);
+            --card-bg: rgba(30, 20, 20, 0.85);
+            --card-border: rgba(140, 103, 35, 0.4);
+            --text-main: #ffeedb;
+            --text-muted: #cfa470;
+            --accent-color: #d4af37;
+            --accent-hover: #b8860b;
+            --accent-bg: rgba(212, 175, 55, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1e1414;
+            --select-color: #ffeedb;
+        }
+        body.theme-harry-potter .stat-value {
+            background: linear-gradient(to right, #d4af37, #ffdd66) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffeedb !important;
+        }
+
+        /* 6. marvel */
+        body.theme-marvel {
+            --bg-gradient: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            --card-bg: rgba(28, 28, 28, 0.85);
+            --card-border: rgba(237, 29, 36, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --accent-color: #ed1d24;
+            --accent-hover: #c41419;
+            --accent-bg: rgba(237, 29, 36, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1c1c1c;
+            --select-color: #ffffff;
+        }
+        body.theme-marvel .stat-value {
+            background: linear-gradient(to right, #ffffff, #aaaaaa) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffffff !important;
+        }
+
+        /* 7. loki */
+        body.theme-loki {
+            --bg-gradient: linear-gradient(135deg, #181512 0%, #29221c 100%);
+            --card-bg: rgba(34, 27, 22, 0.85);
+            --card-border: rgba(212, 137, 68, 0.4);
+            --text-main: #fceeda;
+            --text-muted: #c6a386;
+            --accent-color: #ec9e59;
+            --accent-hover: #d48944;
+            --accent-bg: rgba(236, 158, 89, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #221b16;
+            --select-color: #fceeda;
+        }
+        body.theme-loki .stat-value {
+            background: linear-gradient(to right, #ec9e59, #ffddaa) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #fceeda !important;
+        }
+
+        /* 8. winamp */
+        body.theme-winamp {
+            --bg-gradient: linear-gradient(135deg, #1a1c22 0%, #0e1014 100%);
+            --card-bg: rgba(33, 36, 45, 0.85);
+            --card-border: rgba(74, 85, 104, 0.5);
+            --text-main: #00e1ff;
+            --text-muted: #888e99;
+            --accent-color: #33ff33;
+            --accent-hover: #00e1ff;
+            --accent-bg: rgba(51, 255, 51, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #21242d;
+            --select-color: #00e1ff;
+        }
+        body.theme-winamp .stat-value {
+            background: linear-gradient(to right, #33ff33, #00e1ff) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #00e1ff !important;
+        }
+
+        /* 9. vichy */
+        body.theme-vichy {
+            --bg-gradient: linear-gradient(135deg, #0d0f0f 0%, #161919 100%);
+            --card-bg: rgba(22, 25, 25, 0.85);
+            --card-border: rgba(5, 173, 152, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #BBBFBF;
+            --accent-color: #05AD98;
+            --accent-hover: #048c7a;
+            --accent-bg: rgba(5, 173, 152, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #161919;
+            --select-color: #ffffff;
+        }
+        body.theme-vichy .stat-value {
+            background: linear-gradient(to right, #ffffff, #05AD98) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #ffffff !important;
+        }
+
+        /* 10. sorbet */
+        body.theme-sorbet {
+            --bg-gradient: linear-gradient(135deg, #141512 0%, #1f211d 100%);
+            --card-bg: rgba(31, 33, 29, 0.85);
+            --card-border: rgba(183, 195, 150, 0.4);
+            --text-main: #FEFEFE;
+            --text-muted: #CCCCCC;
+            --accent-color: #B7C396;
+            --accent-hover: #a1ad80;
+            --accent-bg: rgba(183, 195, 150, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #1f211d;
+            --select-color: #FEFEFE;
+        }
+        body.theme-sorbet .stat-value {
+            background: linear-gradient(to right, #FEFEFE, #B7C396) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #FEFEFE !important;
+        }
+
+        /* 11. frozen-mist */
+        body.theme-frozen-mist {
+            --bg-gradient: linear-gradient(135deg, #151614 0%, #21221f 100%);
+            --card-bg: rgba(33, 34, 31, 0.85);
+            --card-border: rgba(221, 112, 11, 0.4);
+            --text-main: #FCF8D8;
+            --text-muted: #ADACA7;
+            --accent-color: #DD700B;
+            --accent-hover: #b85c07;
+            --accent-bg: rgba(221, 112, 11, 0.75);
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --select-bg: #21221f;
+            --select-color: #FCF8D8;
+        }
+        body.theme-frozen-mist .stat-value {
+            background: linear-gradient(to right, #FCF8D8, #DD700B) !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-background-clip: text !important;
+            color: #FCF8D8 !important;
+        }
+        
+        #loadingOverlay {
+            background: var(--bg-gradient) !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay de Carga -->
+    <div id="loadingOverlay">
+        <div class="spinner-custom mb-3"></div>
+        <h5 class="text-white font-weight-bold" style="letter-spacing: 0.05em;">Procesando Historial de Citas...</h5>
+        <p class="text-muted" style="font-size: 0.8rem;">Esto puede tomar unos segundos debido al gran volumen de datos.</p>
+    </div>
+
+    <div class="container-fluid py-2">
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+            <div>
+                <h4 class="m-0 font-weight-extrabold text-white" style="letter-spacing: -0.01em;">Dashboard: Análisis de Turnos ITEO</h4>
+                <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación estadística en tiempo real conectada a Supabase</p>
+            </div>
+            <button onclick="generarInforme()" class="btn-reporte d-print-none">📄 Generar Informe PDF</button>
+        </div>
+        
+        <!-- Filters Area -->
+        <div class="glass-card p-3 mb-4">
+            <div class="row row-cols-2 row-cols-md-5 g-2">
+                <div class="col">
+                    <div class="stat-label">Tipo Consulta</div>
+                    <select id="tipoFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todos">Todos los Tipos</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Filtrar por Día</div>
+                    <select id="dateFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todos">Todos los Días</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Médico</div>
+                    <select id="medicoFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todos">Todos los Médicos</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Clase de Cobertura</div>
+                    <select id="claseFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todas">Todas las Clases</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Cobertura</div>
+                    <select id="coberturaFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todas">Todas las Coberturas</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs row -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Total Consultas</div>
+                    <div class="stat-value" id="totalConsultorio">0</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Asistencia (Méd)</div>
+                    <div class="stat-value" id="asistenciaPorcentaje" style="background: linear-gradient(to right, #34d399, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0%</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Total Rayos (RX)</div>
+                    <div class="stat-value" id="totalRx" style="background: linear-gradient(to right, #fca5a5, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Índice RX / Cons.</div>
+                    <div class="stat-value" id="ratioRxCons" style="background: linear-gradient(to right, #fcd34d, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0%</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Índice Eco / Cons.</div>
+                    <div class="stat-value" id="ratioEcoCons" style="background: linear-gradient(to right, #c084fc, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0%</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">(RX + Eco) / Cons.</div>
+                    <div class="stat-value" id="ratioAmbosCons" style="background: linear-gradient(to right, #67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts grid Row 1 -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Pacientes por Día</div>
+                    <div class="chart-container-box">
+                        <canvas id="diasChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Frecuencia Horaria (Citas por Hora)</div>
+                    <div class="chart-container-box">
+                        <canvas id="horasChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts grid Row 2 -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Pacientes por Médico</div>
+                    <div class="chart-container-box-large">
+                        <canvas id="medicosChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Coberturas Principales (Top 15)</div>
+                    <div class="chart-container-box-large">
+                        <canvas id="coberturasChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts grid Row 3 (Doughnut / Pie Charts) -->
+        <div class="row g-3 justify-content-center">
+            <div class="col-12 col-md-4">
+                <div class="glass-card">
+                    <div class="card-header-premium">Tasa de Asistencia</div>
+                    <div class="chart-container-box">
+                        <canvas id="asistenciaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="glass-card">
+                    <div class="card-header-premium">Distribución por Clase</div>
+                    <div class="chart-container-box">
+                        <canvas id="claseChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="glass-card">
+                    <div class="card-header-premium">Distribución por Tipo de Consulta</div>
+                    <div class="chart-container-box">
+                        <canvas id="tipoConsultaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de lógica de análisis -->
+    <script>
+        // Global variables
+        let rawData = [];
+        
+        let medicosChartInst = null;
+        let coberturasChartInst = null;
+        let diasChartInst = null;
+        let horasChartInst = null;
+        let claseChartInst = null;
+        let asistenciaChartInst = null;
+        let tipoConsultaChartInst = null;
+
+        // Detect and apply theme dynamically before running anything
+        function applyTheme() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTheme = urlParams.get('theme') || localStorage.getItem('cov_active_theme') || 'minimal';
+            
+            document.body.className = '';
+            document.body.classList.add('theme-' + activeTheme);
+            
+            // Adjust Chart.js defaults dynamically based on CSS variables of active theme
+            const style = getComputedStyle(document.body);
+            const textMuted = style.getPropertyValue('--text-muted').trim() || '#94a3b8';
+            const cardBorder = style.getPropertyValue('--card-border').trim() || 'rgba(255, 255, 255, 0.08)';
+            
+            Chart.defaults.color = textMuted;
+            Chart.defaults.borderColor = cardBorder;
+            Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+        }
+        applyTheme();
+
+        async function init() {
+            try {
+                console.log("Fetching appointments data from local Express cache...");
+                const response = await fetch('/api/appointments-summary');
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
+                }
+                rawData = await response.json();
+                console.log(`Loaded ${rawData.length} appointments dynamically.`);
+
+                // Ocultar Overlay
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 300);
+                }
+
+                // Populate filter options dynamically
+                populateFilters();
+
+                // Render dashboard
+                updateDashboard();
+
+            } catch (err) {
+                console.error("Failed to load appointments summary:", err);
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.innerHTML = `<h5 class="text-danger font-weight-bold">Error de Conexión</h5>
+                                         <p class="text-white mt-2">No se pudo obtener el historial de citas del backend.</p>
+                                         <button onclick="location.reload()" class="btn btn-primary mt-3">Reintentar</button>`;
+                }
+            }
+        }
+
+        function populateFilters() {
+            const tipos = new Set();
+            const fechas = new Set();
+            const medicos = new Set();
+            const clases = new Set();
+            const coberturas = new Set();
+
+            rawData.forEach(r => {
+                if (r["Tipo Consulta"]) tipos.add(r["Tipo Consulta"]);
+                if (r.FechaLimpia) fechas.add(r.FechaLimpia);
+                if (r.Doctor) medicos.add(r.Doctor);
+                if (r.Clase) clases.add(r.Clase);
+                if (r.CoberturaLimpia) coberturas.add(r.CoberturaLimpia);
+            });
+
+            // Sort dates chronologically: a and b are "DD/MM/YYYY"
+            const sortedFechas = Array.from(fechas).sort((a, b) => {
+                const partsA = a.split('/');
+                const partsB = b.split('/');
+                if (partsA.length !== 3 || partsB.length !== 3) return a.localeCompare(b);
+                const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
+                const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
+                return dateA - dateB;
+            });
+
+            updateSelectElement('tipoFilter', Array.from(tipos).sort(), 'Todos los Tipos', 'Todos');
+            updateSelectElement('dateFilter', sortedFechas, 'Todos los Días', 'Todos');
+            updateSelectElement('medicoFilter', Array.from(medicos).sort(), 'Todos los Médicos', 'Todos');
+            updateSelectElement('claseFilter', Array.from(clases).sort(), 'Todas las Clases', 'Todas');
+            updateSelectElement('coberturaFilter', Array.from(coberturas).sort(), 'Todas las Coberturas', 'Todas');
+        }
+
+        function updateSelectElement(elementId, optionsArray, defaultText, defaultValue) {
+            const select = document.getElementById(elementId);
+            if (!select) return;
+            let html = `<option value="${defaultValue}">${defaultText}</option>`;
+            optionsArray.forEach(opt => {
+                html += `<option value="${opt}">${opt}</option>`;
+            });
+            select.innerHTML = html;
+        }
+
+        function countFrequencies(dataArray, key) {
+            const counts = {};
+            dataArray.forEach(item => {
+                const val = item[key];
+                counts[val] = (counts[val] || 0) + 1;
+            });
+            return counts;
+        }
+
+        function getSortedTop(countsObj, topN = null) {
+            let arr = Object.keys(countsObj).map(k => ({ label: k, count: countsObj[k] }));
+            arr.sort((a, b) => b.count - a.count);
+            if (topN) arr = arr.slice(0, topN);
+            return arr;
+        }
+
+        function updateDashboard() {
+            const selectedDate = document.getElementById('dateFilter').value;
+            const selectedCobertura = document.getElementById('coberturaFilter').value;
+            const selectedClase = document.getElementById('claseFilter').value;
+            const selectedTipo = document.getElementById('tipoFilter').value;
+            const selectedMedico = document.getElementById('medicoFilter').value;
+
+            let baseFilteredData = rawData;
+            if (selectedDate !== 'Todos') {
+                baseFilteredData = baseFilteredData.filter(d => d.FechaLimpia === selectedDate);
+            }
+            if (selectedCobertura !== 'Todas') {
+                baseFilteredData = baseFilteredData.filter(d => d.CoberturaLimpia === selectedCobertura);
+            }
+            if (selectedClase !== 'Todas') {
+                baseFilteredData = baseFilteredData.filter(d => d.Clase === selectedClase);
+            }
+            if (selectedTipo !== 'Todos') {
+                baseFilteredData = baseFilteredData.filter(d => d['Tipo Consulta'] === selectedTipo);
+            }
+            if (selectedMedico !== 'Todos') {
+                baseFilteredData = baseFilteredData.filter(d => d.Doctor === selectedMedico);
+            }
+
+            // KPIs (Consultorio + Consultorio Externo counts)
+            let totalConsultorio = baseFilteredData.filter(d => d['Tipo Consulta'] === 'CONSULTORIO' || d['Tipo Consulta'] === 'CONSULTORIO EXTERNO').length;
+            let totalRx = baseFilteredData.filter(d => d['Tipo Consulta'] === 'RAYOS').length;
+            let totalEco = baseFilteredData.filter(d => d['Tipo Consulta'] === 'ECOGRAFIAS').length;
+
+            document.getElementById('totalConsultorio').innerText = totalConsultorio;
+            document.getElementById('totalRx').innerText = totalRx;
+            
+            let ratioRx = totalConsultorio > 0 ? Math.round((totalRx / totalConsultorio) * 100) : 0;
+            let ratioEco = totalConsultorio > 0 ? Math.round((totalEco / totalConsultorio) * 100) : 0;
+            let ratioAmbos = totalConsultorio > 0 ? Math.round(((totalRx + totalEco) / totalConsultorio) * 100) : 0;
+            
+            document.getElementById('ratioRxCons').innerText = ratioRx + "%";
+            document.getElementById('ratioEcoCons').innerText = ratioEco + "%";
+            document.getElementById('ratioAmbosCons').innerText = ratioAmbos + "%";
+
+            // If we check 'Todos' for Tipo Consulta, we filter out Rayos and Ecografías for charts to highlight medical office scheduling.
+            let filteredData = baseFilteredData;
+            if (selectedTipo === 'Todos') {
+                filteredData = baseFilteredData.filter(d => d['Tipo Consulta'] !== 'RAYOS' && d['Tipo Consulta'] !== 'ECOGRAFIAS');
+            }
+            
+            const asistenciaCounts = countFrequencies(filteredData, 'Atendido_Label');
+            const asistioCount = asistenciaCounts['Asistió'] || 0;
+            const porcentajeAsistencia = filteredData.length > 0 ? Math.round((asistioCount / filteredData.length) * 100) : 0;
+            document.getElementById('asistenciaPorcentaje').innerText = porcentajeAsistencia + "%";
+
+            const medicosCounts = countFrequencies(filteredData, 'Doctor');
+            const medicosArr = getSortedTop(medicosCounts, 15); // Top 15 Doctors
+
+            const coberturasCounts = countFrequencies(filteredData, 'CoberturaLimpia');
+            const coberturasArr = getSortedTop(coberturasCounts, 15);
+
+            const diasCounts = countFrequencies(filteredData, 'FechaLimpia');
+            const diasArr = Object.keys(diasCounts).map(k => {
+                const parts = k.split('/');
+                const sortKey = parts.length === 3 ? parts[2] + parts[1] + parts[0] : k;
+                return { label: k, count: diasCounts[k], sortKey: sortKey };
+            }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+            // Group by hour instead of specific minutes
+            const horasCounts = {};
+            filteredData.forEach(item => {
+                const horaLimpia = item.HoraLimpia || "00:00";
+                const hour = horaLimpia.split(':')[0] || "00";
+                const label = hour.padStart(2, '0') + ":00";
+                horasCounts[label] = (horasCounts[label] || 0) + 1;
+            });
+
+            const horasArr = Object.keys(horasCounts).map(k => {
+                return { label: k, count: horasCounts[k] };
+            }).sort((a, b) => {
+                const hourA = parseInt(a.label.split(':')[0]) || 0;
+                const hourB = parseInt(b.label.split(':')[0]) || 0;
+                return hourA - hourB;
+            });
+
+            const clasesCounts = countFrequencies(filteredData, 'Clase');
+            const clasesArr = getSortedTop(clasesCounts);
+            
+            const tipoConsultaCounts = countFrequencies(filteredData, 'Tipo Consulta');
+            const tipoConsultaArr = getSortedTop(tipoConsultaCounts);
+            
+            const asistenciaArr = getSortedTop(asistenciaCounts);
+
+            const style = getComputedStyle(document.body);
+            const accentColor = style.getPropertyValue('--accent-color').trim() || '#6366f1';
+            const accentBg = style.getPropertyValue('--accent-bg').trim() || 'rgba(99, 102, 241, 0.75)';
+            const chartGrid = style.getPropertyValue('--chart-grid').trim() || 'rgba(255, 255, 255, 0.05)';
+
+            // 1. Doctors Chart
+            if (medicosChartInst) medicosChartInst.destroy();
+            medicosChartInst = new Chart(document.getElementById('medicosChart'), {
+                type: 'bar',
+                data: {
+                    labels: medicosArr.map(x => x.label),
+                    datasets: [{
+                        label: 'Pacientes',
+                        data: medicosArr.map(x => x.count),
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: { 
+                    indexAxis: 'y', 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false } 
+                    },
+                    scales: {
+                        x: { grid: { color: chartGrid } },
+                        y: { 
+                            grid: { display: false },
+                            ticks: { autoSkip: false, font: { size: 9 } } 
+                        }
+                    }
+                }
+            });
+
+            // 2. Coverages Chart
+            if (coberturasChartInst) coberturasChartInst.destroy();
+            coberturasChartInst = new Chart(document.getElementById('coberturasChart'), {
+                type: 'bar',
+                data: {
+                    labels: coberturasArr.map(x => x.label),
+                    datasets: [{
+                        label: 'Pacientes',
+                        data: coberturasArr.map(x => x.count),
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: { 
+                    indexAxis: 'y', 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false } 
+                    },
+                    scales: {
+                        x: { grid: { color: chartGrid } },
+                        y: { 
+                            grid: { display: false },
+                            ticks: { autoSkip: false, font: { size: 9 } } 
+                        }
+                    }
+                }
+            });
+
+            // 3. Days Chart
+            if (diasChartInst) diasChartInst.destroy();
+            diasChartInst = new Chart(document.getElementById('diasChart'), {
+                type: 'line',
+                data: {
+                    labels: diasArr.map(x => x.label),
+                    datasets: [{
+                        label: 'Pacientes por Día',
+                        data: diasArr.map(x => x.count),
+                        backgroundColor: accentBg.replace('0.75', '0.1').replace('0.9', '0.1'),
+                        borderColor: accentColor,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 8 } } },
+                        y: { grid: { color: chartGrid } }
+                    }
+                }
+            });
+
+            // 4. Hours Chart
+            if (horasChartInst) horasChartInst.destroy();
+            horasChartInst = new Chart(document.getElementById('horasChart'), {
+                type: 'bar',
+                data: {
+                    labels: horasArr.map(x => x.label),
+                    datasets: [{
+                        label: 'Citas por Hora',
+                        data: horasArr.map(x => x.count),
+                        backgroundColor: accentBg,
+                        borderColor: accentColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { color: chartGrid } }
+                    }
+                }
+            });
+
+            // 5. Classes (Doughnut)
+            if (claseChartInst) claseChartInst.destroy();
+            claseChartInst = new Chart(document.getElementById('claseChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: clasesArr.map(x => x.label),
+                    datasets: [{
+                        data: clasesArr.map(x => x.count),
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#64748b']
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 9 } } }
+                    }
+                }
+            });
+            
+            // 6. Consultation Types (Doughnut)
+            if (tipoConsultaChartInst) tipoConsultaChartInst.destroy();
+            tipoConsultaChartInst = new Chart(document.getElementById('tipoConsultaChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: tipoConsultaArr.map(x => x.label),
+                    datasets: [{
+                        data: tipoConsultaArr.map(x => x.count),
+                        backgroundColor: ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#64748b']
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 9 } } }
+                    }
+                }
+            });
+            
+            // 7. Attendance (Pie)
+            if (asistenciaChartInst) asistenciaChartInst.destroy();
+            asistenciaChartInst = new Chart(document.getElementById('asistenciaChart'), {
+                type: 'pie',
+                data: {
+                    labels: asistenciaArr.map(x => x.label),
+                    datasets: [{
+                        data: asistenciaArr.map(x => x.count),
+                        backgroundColor: ['#10b981', '#ef4444', '#64748b']
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
+        function generarInforme() {
+            const win = window.open('', '_blank');
+            const totalCons = document.getElementById('totalConsultorio').innerText;
+            const asist = document.getElementById('asistenciaPorcentaje').innerText;
+            const rx = document.getElementById('totalRx').innerText;
+            const idxRx = document.getElementById('ratioRxCons').innerText;
+            const idxEco = document.getElementById('ratioEcoCons').innerText;
+            const idxAmbos = document.getElementById('ratioAmbosCons').innerText;
+            
+            const dateF = document.getElementById('dateFilter').value;
+            const claseF = document.getElementById('claseFilter').value;
+            const cobF = document.getElementById('coberturaFilter').value;
+            const tipoF = document.getElementById('tipoFilter').value;
+
+            const medicos = medicosChartInst.data.labels;
+            const medicosData = medicosChartInst.data.datasets[0].data;
+            let rowsHtml = '';
+            for(let i=0; i<medicos.length; i++) {
+                rowsHtml += `<tr><td style="padding:8px; border-bottom:1px solid #ddd;">${medicos[i]}</td><td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${medicosData[i]}</td></tr>`;
+            }
+
+            const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Informe de Turnos ITEO</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
+                    h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
+                    .metrics { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
+                    .metric-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; flex: 1; min-width: 150px; text-align: center; }
+                    .metric-title { font-size: 0.9em; color: #6c757d; text-transform: uppercase; }
+                    .metric-val { font-size: 1.8em; font-weight: bold; color: #212529; margin-top: 5px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { text-align: left; background: #e9ecef; padding: 10px; border-bottom: 2px solid #ccc; }
+                    .filters { margin-bottom: 30px; padding: 15px; background: #eef2f5; border-radius: 8px; font-size: 0.9em; }
+                    @media print { body { padding: 0; } .d-print-none { display: none; } }
+                </style>
+            </head>
+            <body>
+                <button onclick="window.print()" class="d-print-none" style="float: right; padding: 10px 20px; font-size: 16px; cursor:pointer;">Imprimir Informe</button>
+                <h1>Informe Analítico de Turnos ITEO</h1>
+                
+                <div class="filters">
+                    <strong>Filtros aplicados:</strong><br>
+                    Día: ${dateF} | Tipo de Consulta: ${tipoF} | Clase: ${claseF} | Cobertura: ${cobF}
+                </div>
+
+                <div class="metrics">
+                    <div class="metric-box"><div class="metric-title">Total Consultorio</div><div class="metric-val">${totalCons}</div></div>
+                    <div class="metric-box"><div class="metric-title">Asistencia (Méd)</div><div class="metric-val" style="color: #10b981;">${asist}</div></div>
+                    <div class="metric-box"><div class="metric-title">Total Rayos (RX)</div><div class="metric-val" style="color: #ef4444;">${rx}</div></div>
+                </div>
+                <div class="metrics">
+                    <div class="metric-box"><div class="metric-title">Índice RX / Cons.</div><div class="metric-val" style="color: #f59e0b;">${idxRx}</div></div>
+                    <div class="metric-box"><div class="metric-title">Índice Eco / Cons.</div><div class="metric-val" style="color: #8b5cf6;">${idxEco}</div></div>
+                    <div class="metric-box"><div class="metric-title">Índice (RX+Eco) / Cons.</div><div class="metric-val" style="color: #06b6d4;">${idxAmbos}</div></div>
+                </div>
+
+                <h2>Detalle de Turnos por Profesional</h2>
+                <table>
+                    <thead>
+                        <tr><th>Profesional Médico</th><th style="text-align:right;">Cantidad de Turnos</th></tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </body>
+            </html>
+            `;
+            win.document.write(html);
+            win.document.close();
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
