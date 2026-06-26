@@ -767,8 +767,41 @@ export default function App() {
     setHasUnsavedChanges(true);
   };
 
-  const handleSyncDemand = () => {
-    fileInputRef.current?.click();
+  const handleSyncDemand = async () => {
+    setIsSyncing(true);
+    try {
+      console.log("Iniciando actualización automática desde el backend...");
+      const response = await fetch('/api/sync-demand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`El servidor respondió con código ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        alert("¡Base de datos de Supabase actualizada con éxito desde la turnera FTP!");
+        // Refrescar datos
+        const data = await fetchDb();
+        setPersons(data.persons || []);
+        setShifts(data.shifts || []);
+        setTargets(data.targets || []);
+        setAreas(data.areas || []);
+        setDemand(data.demand || []);
+        setAttendance(data.attendance || []);
+      } else {
+        throw new Error(result.error || "Error desconocido");
+      }
+    } catch (err: any) {
+      console.error("Error en sincronización automática:", err);
+      if (window.confirm(`No se pudo actualizar automáticamente desde el servidor: ${err.message || err}\n\n¿Deseas realizar la actualización manual seleccionando un archivo de Excel local?`)) {
+        fileInputRef.current?.click();
+      }
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1165,7 +1198,7 @@ export default function App() {
                 title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
               >
                 <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
+                <span>{isSyncing ? 'Actualizando...' : 'Actualizador de turnos'}</span>
               </button>
 
               <input
