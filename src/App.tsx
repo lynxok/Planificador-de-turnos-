@@ -795,14 +795,30 @@ export default function App() {
         throw new Error(result.error || "Error desconocido");
       }
     } catch (err: any) {
-      console.error("Error en sincronización automática:", err);
-      if (window.confirm(`No se pudo actualizar automáticamente desde el servidor: ${err.message || err}\n\n¿Deseas realizar la actualización manual seleccionando un archivo de Excel local?`)) {
-        fileInputRef.current?.click();
+      console.error("Error en sincronización automática local:", err);
+      
+      // En producción, intentamos disparar GitHub Actions en la nube a través de la base de datos
+      try {
+        console.log("Intentando sincronización en la nube mediante Supabase...");
+        const { data: rpcData, error: rpcError } = await supabase.rpc('trigger_github_sync');
+        if (rpcError) throw rpcError;
+        
+        if (rpcData && rpcData.success) {
+          alert("¡Solicitud enviada a la nube! GitHub Actions ha iniciado la sincronización de turnos desde el FTP. Los datos tardarán de 1 a 2 minutos en impactarse. Puedes refrescar la página en un momento.");
+        } else {
+          throw new Error(rpcData?.error || "Error en RPC");
+        }
+      } catch (cloudErr: any) {
+        console.error("Error en sincronización en la nube:", cloudErr);
+        if (window.confirm(`No se pudo iniciar la sincronización automática:\n- Local: ${err.message || err}\n- Nube: ${cloudErr.message || cloudErr}\n\n¿Deseas realizar la actualización manual seleccionando un archivo de Excel local?`)) {
+          fileInputRef.current?.click();
+        }
       }
     } finally {
       setIsSyncing(false);
     }
   };
+
 
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
