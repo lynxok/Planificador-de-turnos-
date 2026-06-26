@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { supabase } from './supabase';
 import { Person, Shift, Area, TargetCoverage, DemandRecord, AttendanceRecord } from './types';
 import { fetchDb, saveDb } from './api';
 import { SEEDED_PERSONS, INITIAL_SHIFTS, DEFAULT_TARGETS, DAYS_OF_WEEK } from './seedData';
@@ -71,6 +73,7 @@ export default function App() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 2. Navigation/View States
   const [activeDate, setActiveDate] = useState(() => {
@@ -84,7 +87,9 @@ export default function App() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [showResourceSidebar, setShowResourceSidebar] = useState<boolean>(true);
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState<boolean>(false);
-  const [activeArea, setActiveArea] = useState<Area>('Atención');
+  const [activeArea, setActiveArea] = useState<Area>(() => {
+    return (localStorage.getItem('cov_active_area') as Area) || 'Atención';
+  });
   const [activeTab, setActiveTab] = useState<Area | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalShift, setModalShift] = useState<Shift | null>(null);
@@ -200,7 +205,8 @@ export default function App() {
   // 3. Load & Initialize API
   useEffect(() => {
     fetchDb().then((data) => {
-      setPersons(data.persons || []);
+      const loadedPersons = data.persons || [];
+      setPersons(loadedPersons);
 
       // MIGRATION: Convert old dayOfWeek to date based on activeDate week
       let loadedShifts = data.shifts || [];
@@ -225,13 +231,35 @@ export default function App() {
       
       setTargets(data.targets || []);
       
+      let resolvedAreas: Area[];
       if (!data.areas || data.areas.length === 0) {
-        // Mantenemos las áreas por defecto para que la app no se rompa al buscar una categoría, pero sin empleados.
-        const defaultAreas = ['Atención', 'Soporte', 'Ventas', 'Administración'];
-        setAreas(defaultAreas);
-        saveDb({ areas: defaultAreas });
+        resolvedAreas = ['Atención', 'Soporte', 'Ventas', 'Administración'];
+        setAreas(resolvedAreas);
+        saveDb({ areas: resolvedAreas });
       } else {
-        setAreas(data.areas);
+        resolvedAreas = data.areas;
+        setAreas(resolvedAreas);
+      }
+
+      // ALWAYS pick the area with the most shifts so the coverage monitor shows real data.
+      // We ignore localStorage to avoid stale area selections (e.g. Quirofano with 1 historical shift).
+      // The user can still change the area manually via the dropdown.
+      const shiftCounts = new Map<string, number>();
+      loadedShifts.forEach(s => {
+        shiftCounts.set(s.area, (shiftCounts.get(s.area) || 0) + 1);
+      });
+      let bestArea: Area | null = null;
+      let bestCount = 0;
+      resolvedAreas.forEach(a => {
+        const count = shiftCounts.get(a) || 0;
+        if (count > bestCount) {
+          bestCount = count;
+          bestArea = a as Area;
+        }
+      });
+      if (bestArea && bestCount > 0) {
+        setActiveArea(bestArea);
+        localStorage.setItem('cov_active_area', bestArea);
       }
 
       setDemand(data.demand || []);
@@ -739,15 +767,88 @@ export default function App() {
     setHasUnsavedChanges(true);
   };
 
-  const handleSyncDemand = async () => {
+  const handleSyncDemand = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/sync-demand', { method: 'POST' });
-      if (!res.ok) throw new Error('Sync failed');
-      const result = await res.json();
-      alert(`¡Sincronización completada con éxito! Se sincronizaron los turnos en Supabase (Días con demanda: ${result.demandCount}).`);
+      const reader = new FileReader();
+      const dataPromise = new Promise<ArrayBuffer>((resolve, reject) => {
+        reader.onload = (e) => {
+          if (e.target?.result instanceof ArrayBuffer) {
+            resolve(e.target.result);
+          } else {
+            reject(new Error("No se pudo leer el archivo."));
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+
+      const buffer = await dataPromise;
+      const workbook = XLSX.read(buffer, { type: 'array' });
       
-      // Refresh the dashboard data
+      if (!workbook.Sheets["Sheet1"]) {
+        throw new Error("El archivo de Excel no contiene la hoja 'Sheet1'");
+      }
+      
+      const sheet = workbook.Sheets["Sheet1"];
+      const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+      console.log(`Cargadas ${rows.length} filas desde el Excel cargado.`);
+
+      const uniqueMap = new Map();
+      rows.forEach((r: any) => {
+        const serial = r["Turno"];
+        if (!serial || typeof serial !== 'number') return;
+        
+        const parseExcelDateTimeForUpsert = (sVal: number) => {
+          const utc_days = Math.floor(sVal - 25569);
+          const utc_value = utc_days * 86400 * 1000;
+          const dateObj = new Date(utc_value);
+
+          const fractional_day = sVal - Math.floor(sVal);
+          const total_seconds = Math.round(fractional_day * 24 * 60 * 60);
+          const hours = Math.floor(total_seconds / 3600);
+          
+          return `${dateObj.getUTCFullYear()}-${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}-${String(dateObj.getUTCDate()).padStart(2, '0')} ${String(hours).padStart(2, '0')}:00:00`;
+        };
+
+        const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
+        const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;
+        
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
+            profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
+            cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
+            turno: turnoTimestamp,
+            asistio: r["Asistio"] !== undefined && r["Asistio"] !== null ? Number(r["Asistio"]) : 0,
+            atendido: r["Atendido"] !== undefined && r["Atendido"] !== null ? Number(r["Atendido"]) : 0,
+            nro_hc: r["NroHc"] !== undefined && r["NroHc"] !== null ? String(r["NroHc"]).trim() : ""
+          });
+        }
+      });
+
+      const mappedRows = Array.from(uniqueMap.values());
+      console.log(`Mapeadas ${mappedRows.length} filas únicas.`);
+
+      // Upload in batches of 1000
+      const BATCH_SIZE = 1000;
+      for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
+        const batch = mappedRows.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .rpc('upsert_patient_appointments', { payload: batch });
+        if (error) throw error;
+      }
+
+      alert(`¡Sincronización completada con éxito! Se cargaron ${mappedRows.length} citas.`);
+      
+      // Refresh DB
       const data = await fetchDb();
       setPersons(data.persons || []);
       setShifts(data.shifts || []);
@@ -755,11 +856,12 @@ export default function App() {
       setAreas(data.areas || []);
       setDemand(data.demand || []);
       setAttendance(data.attendance || []);
-    } catch (error) {
-      console.error('Failed to sync demand', error);
-      alert('Ocurrió un error al intentar sincronizar los turnos desde el FTP.');
+    } catch (err: any) {
+      console.error('Excel processing/upload failed:', err);
+      alert(`Error al procesar o subir el archivo de turnos: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
+      if (event.target) event.target.value = '';
     }
   };
 
@@ -1065,6 +1167,14 @@ export default function App() {
                 <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Turnos'}</span>
               </button>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleExcelUpload}
+                accept=".xlsx, .xls"
+                style={{ display: 'none' }}
+              />
 
               <button
                 onClick={() => setIsAttendanceModalOpen(true)}
@@ -1431,6 +1541,7 @@ export default function App() {
                       onChange={(e) => {
                         const val = e.target.value as Area;
                         setActiveArea(val);
+                        localStorage.setItem('cov_active_area', val);
                       }}
                       className="text-xs font-bold border border-slate-250 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans cursor-pointer"
                     >

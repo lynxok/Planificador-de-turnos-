@@ -658,13 +658,23 @@
 
         async function init() {
             try {
-                console.log("Fetching appointments data from local Express cache...");
-                const response = await fetch('/api/appointments-summary');
+                console.log("Fetching appointments data from Supabase RPC...");
+                const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
+                const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndiZ3V3bWJ3dXR2aHFzaXJ0anBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5Nzg1OTYsImV4cCI6MjA4MzU1NDU5Nn0.tiqGxp4BxqoI7P_jasfZORWjIyvqCbIcwvk9Elmzoa8';
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/rpc/fetch_appointments_summary`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseAnonKey,
+                        'Authorization': `Bearer ${supabaseAnonKey}`
+                    }
+                });
                 if (!response.ok) {
                     throw new Error("HTTP error " + response.status);
                 }
                 rawData = await response.json();
-                console.log(`Loaded ${rawData.length} appointments dynamically.`);
+                console.log(`Loaded ${rawData.length} appointments dynamically via RPC.`);
 
                 // Ocultar Overlay
                 const overlay = document.getElementById('loadingOverlay');

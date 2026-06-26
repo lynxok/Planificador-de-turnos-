@@ -143,9 +143,12 @@ export function CoverageChart({
   const actualCoverage = calculateCoverage(combinedShiftsForCoverage, activeArea, hourRange);
 
   // Determinar el objetivo a mostrar: 
-  // Si hay demanda calculada para el día y área actual, la usamos en vez de targetCount manual
-  const todaysDemandRecord = activeDate ? demand.find(d => d.dateString === activeDate && d.area === activeArea) : undefined;
-  const effectiveTargetCount = todaysDemandRecord ? todaysDemandRecord.hourlyRequirements : targetCount;
+  // Si hay demanda calculada para el día, la usamos en vez de targetCount manual.
+  // Los datos de citas (ART/OS) son del hospital en general, no por área específica.
+  const todaysDemandRecord = activeDate ? demand.find(d => d.dateString === activeDate) : undefined;
+  const effectiveTargetCount = (todaysDemandRecord && todaysDemandRecord.area === activeArea && todaysDemandRecord.hourlyRequirements?.some(r => r > 0))
+    ? todaysDemandRecord.hourlyRequirements 
+    : targetCount;
 
   // Calcular inicios y fin de turnos por hora (para la área activa de hoy)
   const startsPerHour = new Array(24).fill(0);
