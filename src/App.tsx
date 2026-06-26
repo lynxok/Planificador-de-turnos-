@@ -48,8 +48,11 @@ import {
   Menu,
   CalendarDays,
   BarChart3,
-  Users
+  Users,
+  History
 } from 'lucide-react';
+
+import { SyncLogsModal } from './components/SyncLogsModal';
 
 export default function App() {
   // Theme States
@@ -73,6 +76,7 @@ export default function App() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isLogsModalOpen, setIsLogsModalOpen] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 2. Navigation/View States
@@ -895,6 +899,17 @@ export default function App() {
         if (error) throw error;
       }
 
+      // Log manual success
+      try {
+        await supabase.from('planning_sync_logs').insert({
+          status: 'SUCCESS',
+          source: 'BROWSER_MANUAL',
+          details: { message: `Carga manual de Excel exitosa. Sincronizadas ${mappedRows.length} citas.` }
+        });
+      } catch (logErr) {
+        console.error("Could not write manual success log:", logErr);
+      }
+
       alert(`¡Sincronización completada con éxito! Se cargaron ${mappedRows.length} citas.`);
       
       // Refresh DB
@@ -907,6 +922,18 @@ export default function App() {
       setAttendance(data.attendance || []);
     } catch (err: any) {
       console.error('Excel processing/upload failed:', err);
+      
+      // Log manual error
+      try {
+        await supabase.from('planning_sync_logs').insert({
+          status: 'ERROR',
+          source: 'BROWSER_MANUAL',
+          details: { message: err.message || String(err) }
+        });
+      } catch (logErr) {
+        console.error("Could not write manual error log:", logErr);
+      }
+
       alert(`Error al procesar o subir el archivo de turnos: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
@@ -1207,15 +1234,24 @@ export default function App() {
                 </button>
               )}
 
-              <button
-                onClick={handleSyncDemand}
-                disabled={isSyncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md disabled:opacity-50"
-                title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
-              >
-                <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Actualizando...' : 'Actualizador de turnos'}</span>
-              </button>
+              <div className="flex items-center">
+                <button
+                  onClick={handleSyncDemand}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-l-lg cursor-pointer shadow-md disabled:opacity-50 border-r border-indigo-700/30"
+                  title="Sincronizar turnos desde la turnera FTP a la base de datos de Supabase"
+                >
+                  <RefreshCw size={13} className={`text-indigo-100 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Actualizando...' : 'Actualizador de turnos'}</span>
+                </button>
+                <button
+                  onClick={() => setIsLogsModalOpen(true)}
+                  className="flex items-center justify-center px-2.5 py-1.5 bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-r-lg cursor-pointer shadow-md"
+                  title="Ver historial de sincronizaciones"
+                >
+                  <History size={13} className="text-indigo-100" />
+                </button>
+              </div>
 
               <input
                 type="file"
@@ -1753,6 +1789,11 @@ export default function App() {
         onSelectTheme={handleSelectTheme}
         isOpen={isThemePopoverOpen}
         onClose={() => setIsThemePopoverOpen(false)}
+      />
+
+      <SyncLogsModal
+        isOpen={isLogsModalOpen}
+        onClose={() => setIsLogsModalOpen(false)}
       />
     </div>
   );
