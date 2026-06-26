@@ -24,12 +24,10 @@ const FTP_CONFIG = {
 
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://fwsnaasfxfzacchsyijx.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c25hYXNmeGZ6YWNjaHN5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzkxMzksImV4cCI6MjA5MDExNTEzOX0.I9QYbMGbk53SnkfZW7ixICNW9xnUahaRxAKDPK9Vo90';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IndiZ3V3bWJ3dXR2aHFzaXJ0anBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5Nzg1OTYsImV4cCI6MjA4MzU1NDU5Nn0.tiqGxp4BxqoI7P_jasfZORWjIyvqCbIcwvk9Elmzoa8';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: { schema: 'control_de_horas' }
-});
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 function parseExcelDateTimeForUpsert(serial) {
   const utc_days = Math.floor(serial - 25569);
@@ -97,8 +95,7 @@ async function runSync() {
       for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
         const batch = mappedRows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
-          .from('planning_patient_appointments')
-          .upsert(batch, { onConflict: 'paciente,profesional,turno' });
+          .rpc('upsert_patient_appointments', { payload: batch });
         if (error) {
           console.error(`Error uploading batch at index ${i}:`, error.message);
           throw error;
