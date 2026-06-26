@@ -27,7 +27,9 @@ const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 const supabaseUrl = process.env.SUPABASE_URL || 'https://fwsnaasfxfzacchsyijx.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c25hYXNmeGZ6YWNjaHN5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzkxMzksImV4cCI6MjA5MDExNTEzOX0.I9QYbMGbk53SnkfZW7ixICNW9xnUahaRxAKDPK9Vo90';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 
 function parseExcelDateTimeForUpsert(serial) {
   const utc_days = Math.floor(serial - 25569);
