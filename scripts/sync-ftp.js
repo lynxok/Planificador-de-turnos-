@@ -29,7 +29,7 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsIn
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-function parseExcelDateTimeForUpsert(serial: number) {
+function parseExcelDateTimeForUpsert(serial) {
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400 * 1000;
   const dateObj = new Date(utc_value);
@@ -63,12 +63,12 @@ async function runSync() {
     
     if (workbook.Sheets["Sheet1"]) {
       const sheet = workbook.Sheets["Sheet1"];
-      const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+      const rows = XLSX.utils.sheet_to_json(sheet);
       console.log(`Loaded ${rows.length} rows from Excel Sheet1.`);
       
       console.log("Mapping and deduplicating rows...");
       const uniqueMap = new Map();
-      rows.forEach((r: any) => {
+      rows.forEach((r) => {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
         
