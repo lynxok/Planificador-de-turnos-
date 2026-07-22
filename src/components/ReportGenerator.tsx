@@ -168,6 +168,41 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
   const asistieronPct = totalCitas > 0 ? ((asistieronCount / totalCitas) * 100).toFixed(1) : '0';
   const ausentesPct = totalCitas > 0 ? (100 - parseFloat(asistieronPct)).toFixed(1) : '0';
 
+  // 1. Funnel Data (Atenciones por Obra Social, sólo si asistio === 1)
+  const coverageCounts = reportData
+    .filter(r => r.asistio === 1)
+    .reduce((acc: { [key: string]: number }, cur) => {
+      const cov = cur.cobertura || 'Sin obra social';
+      acc[cov] = (acc[cov] || 0) + 1;
+      return acc;
+    }, {});
+
+  const funnelData = Object.entries(coverageCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const maxFunnelCount = funnelData.length > 0 ? funnelData[0].count : 1;
+
+  // 2. Histogram Data (Turnos por Día)
+  const turnosPorDia = reportData.reduce((acc: { [key: string]: number }, cur) => {
+    if (cur.turno) {
+      const dateStr = cur.turno.split('T')[0];
+      acc[dateStr] = (acc[dateStr] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  const histogramData = Object.entries(turnosPorDia)
+    .map(([dateStr, count]) => {
+      const parts = dateStr.split('-');
+      const formatted = `${parts[2]}/${parts[1]}`;
+      return { dateStr, formatted, count };
+    })
+    .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+  const maxHistogramCount = histogramData.length > 0 ? Math.max(...histogramData.map(d => d.count)) : 1;
+
   return (
     <div className={`flex-1 w-full ${theme.cardBg} rounded-2xl border ${theme.cardBorder} shadow-xl flex flex-col p-6 animate-fade-in`}>
       {/* Title */}
@@ -302,6 +337,111 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
                 <Download size={14} />
                 <span>Exportar Reporte a Excel (.xlsx)</span>
               </button>
+            </div>
+          </div>
+
+          {/* Dashboards Row (Funnel & Histogram) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-1">
+            {/* 1. Funnel Chart (Atenciones por Obra Social) */}
+            <div className="bg-slate-900/45 border border-slate-800/80 p-5 rounded-2xl flex flex-col gap-4">
+              <div className="flex items-center gap-2 border-b border-slate-800/40 pb-2.5">
+                <span className="w-2 h-2 bg-indigo-500 rounded-full" />
+                <h3 className="text-xs font-bold text-white font-sans tracking-wide">
+                  Top 5: Atenciones por Obra Social (Embudo)
+                </h3>
+              </div>
+              
+              {funnelData.length > 0 ? (
+                <div className="flex flex-col gap-3.5 justify-center py-2 flex-1">
+                  {funnelData.map((item, idx) => {
+                    const relativePct = (item.count / maxFunnelCount) * 100;
+                    const gradients = [
+                      'from-indigo-600 to-indigo-750',
+                      'from-violet-650 to-violet-750',
+                      'from-purple-650 to-purple-750',
+                      'from-fuchsia-650 to-fuchsia-750',
+                      'from-pink-650 to-pink-755'
+                    ];
+                    const gradient = gradients[idx] || 'from-slate-650 to-slate-750';
+
+                    return (
+                      <div key={item.name} className="flex flex-col items-center w-full">
+                        {/* Label info */}
+                        <div className="flex justify-between w-full max-w-sm text-[10px] text-slate-400 font-bold mb-1 px-1.5">
+                          <span className="truncate max-w-[200px]">{item.name}</span>
+                          <span>{item.count} atenciones ({((item.count / asistieronCount) * 100).toFixed(0)}%)</span>
+                        </div>
+                        {/* Funnel Bar */}
+                        <div className="w-full flex justify-center">
+                          <div 
+                            style={{ width: `${relativePct}%`, minWidth: '40%' }}
+                            className={`h-7 bg-gradient-to-r ${gradient} rounded-lg flex items-center justify-center text-[10px] font-black text-white shadow-md border border-white/5 transition-all hover:brightness-110 select-none cursor-help`}
+                            title={`${item.name}: ${item.count} atenciones de un total de ${asistieronCount}`}
+                          >
+                            <span className="truncate px-2">{item.name} ({item.count})</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-8 text-xs text-slate-500 font-semibold">
+                  <span>Sin atenciones registradas para graficar.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Histogram Chart (Turnos por Día) */}
+            <div className="bg-slate-900/45 border border-slate-800/80 p-5 rounded-2xl flex flex-col gap-4">
+              <div className="flex items-center gap-2 border-b border-slate-800/40 pb-2.5">
+                <span className="w-2 h-2 bg-indigo-500 rounded-full" />
+                <h3 className="text-xs font-bold text-white font-sans tracking-wide">
+                  Histograma: Frecuencia de Turnos por Día
+                </h3>
+              </div>
+
+              {histogramData.length > 0 ? (
+                <div className="flex-1 flex flex-col justify-end min-h-[190px]">
+                  {/* Scrollable Bar Container */}
+                  <div className="w-full overflow-x-auto custom-scrollbar flex items-end h-[150px] pb-1">
+                    <div 
+                      className="flex items-end gap-1.5 h-full px-2"
+                      style={{ minWidth: '100%', width: `${histogramData.length * 30}px` }}
+                    >
+                      {histogramData.map((item) => {
+                        const heightPct = (item.count / maxHistogramCount) * 85; // Capped at 85% for label padding
+                        return (
+                          <div key={item.dateStr} className="flex flex-col items-center justify-end h-full w-6 group/bar relative">
+                            {/* Tooltip on hover */}
+                            <div className="absolute -top-7 bg-slate-950 text-[9px] font-bold text-white px-1.5 py-0.5 rounded border border-slate-800 shadow-xl opacity-0 group-hover/bar:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap">
+                              {item.formatted}: {item.count} turnos
+                            </div>
+                            {/* Bar */}
+                            <div 
+                              style={{ height: `${heightPct}%`, minHeight: '6px' }}
+                              className="w-full bg-gradient-to-t from-indigo-650 to-indigo-500 hover:from-violet-500 hover:to-violet-450 rounded-t-sm shadow-md transition-all cursor-pointer"
+                            />
+                            {/* Date label */}
+                            <span className="text-[8px] font-bold text-slate-500 mt-1 select-none whitespace-nowrap">
+                              {item.formatted}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mt-2 px-1 text-[9px] text-slate-500 font-bold">
+                    <span>← Inicio Período</span>
+                    <span>Desliza para navegar cronología →</span>
+                    <span>Fin Período →</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-8 text-xs text-slate-500 font-semibold">
+                  <span>Sin turnos registrados para graficar.</span>
+                </div>
+              )}
             </div>
           </div>
 
