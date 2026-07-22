@@ -133,6 +133,17 @@ async function syncFromFtpInternal() {
     console.log("Downloading Turnos.xlsx...");
     await client.downloadTo(localExcelPath, "Turnos.xlsx");
     
+    // Fetch rehabilitation professionals to filter out bug appointments
+    console.log("Fetching rehabilitation professionals list for filtering...");
+    const { data: rehabProfs, error: rehabErr } = await supabase
+      .from('turnera_profesionales')
+      .select('profesional')
+      .eq('tipo_consulta', 'REHABILITACION');
+    
+    if (rehabErr) throw rehabErr;
+    const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
+    console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
+
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
@@ -147,6 +158,17 @@ async function syncFromFtpInternal() {
       rows.forEach((r: any) => {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
+
+        // Check for rehabilitation appointments bug (22hs and 23hs)
+        const fractional_day = serial - Math.floor(serial);
+        const total_seconds = Math.round(fractional_day * 24 * 60 * 60);
+        const hours = Math.floor(total_seconds / 3600);
+
+        const profName = r["Profesional"] ? String(r["Profesional"]).trim().toUpperCase() : "";
+        if ((hours === 22 || hours === 23) && rehabProfsSet.has(profName)) {
+          // Skip this bug row
+          return;
+        }
         
         const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
         const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;

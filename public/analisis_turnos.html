@@ -481,7 +481,7 @@
         
         <!-- Filters Area -->
         <div class="glass-card p-3 mb-4">
-            <div class="row row-cols-2 row-cols-md-5 g-2">
+            <div class="row row-cols-2 row-cols-md-6 g-2">
                 <div class="col">
                     <div class="stat-label">Tipo Consulta</div>
                     <select id="tipoFilter" class="form-select filter-select" onchange="updateDashboard()">
@@ -489,10 +489,12 @@
                     </select>
                 </div>
                 <div class="col">
-                    <div class="stat-label">Filtrar por Día</div>
-                    <select id="dateFilter" class="form-select filter-select" onchange="updateDashboard()">
-                        <option value="Todos">Todos los Días</option>
-                    </select>
+                    <div class="stat-label">Desde</div>
+                    <input type="date" id="dateDesde" class="form-control filter-select text-white bg-slate-900 border-slate-800" style="background-color: #0c121c; border-color: #1e293b; color: #fff;" onchange="updateDashboard()" />
+                </div>
+                <div class="col">
+                    <div class="stat-label">Hasta</div>
+                    <input type="date" id="dateHasta" class="form-control filter-select text-white bg-slate-900 border-slate-800" style="background-color: #0c121c; border-color: #1e293b; color: #fff;" onchange="updateDashboard()" />
                 </div>
                 <div class="col">
                     <div class="stat-label">Médico</div>
@@ -717,6 +719,14 @@
                 if (r.CoberturaLimpia) coberturas.add(r.CoberturaLimpia);
             });
 
+            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+            function convertDMYtoYMD(dmy) {
+                if (!dmy) return '';
+                const parts = dmy.split('/');
+                if (parts.length !== 3) return '';
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+
             // Sort dates chronologically: a and b are "DD/MM/YYYY"
             const sortedFechas = Array.from(fechas).sort((a, b) => {
                 const partsA = a.split('/');
@@ -727,8 +737,23 @@
                 return dateA - dateB;
             });
 
+            if (sortedFechas.length > 0) {
+                const minDate = convertDMYtoYMD(sortedFechas[0]);
+                const maxDate = convertDMYtoYMD(sortedFechas[sortedFechas.length - 1]);
+                
+                const desdeInput = document.getElementById('dateDesde');
+                const hastaInput = document.getElementById('dateHasta');
+                if (desdeInput && hastaInput) {
+                    desdeInput.value = minDate;
+                    hastaInput.value = maxDate;
+                    desdeInput.min = minDate;
+                    desdeInput.max = maxDate;
+                    hastaInput.min = minDate;
+                    hastaInput.max = maxDate;
+                }
+            }
+
             updateSelectElement('tipoFilter', Array.from(tipos).sort(), 'Todos los Tipos', 'Todos');
-            updateSelectElement('dateFilter', sortedFechas, 'Todos los Días', 'Todos');
             updateSelectElement('medicoFilter', Array.from(medicos).sort(), 'Todos los Médicos', 'Todos');
             updateSelectElement('claseFilter', Array.from(clases).sort(), 'Todas las Clases', 'Todas');
             updateSelectElement('coberturaFilter', Array.from(coberturas).sort(), 'Todas las Coberturas', 'Todas');
@@ -761,15 +786,33 @@
         }
 
         function updateDashboard() {
-            const selectedDate = document.getElementById('dateFilter').value;
+            const dateDesde = document.getElementById('dateDesde').value;
+            const dateHasta = document.getElementById('dateHasta').value;
             const selectedCobertura = document.getElementById('coberturaFilter').value;
             const selectedClase = document.getElementById('claseFilter').value;
             const selectedTipo = document.getElementById('tipoFilter').value;
             const selectedMedico = document.getElementById('medicoFilter').value;
 
+            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+            function convertDMYtoYMD(dmy) {
+                if (!dmy) return '';
+                const parts = dmy.split('/');
+                if (parts.length !== 3) return '';
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+
             let baseFilteredData = rawData;
-            if (selectedDate !== 'Todos') {
-                baseFilteredData = baseFilteredData.filter(d => d.FechaLimpia === selectedDate);
+            if (dateDesde) {
+                baseFilteredData = baseFilteredData.filter(d => {
+                    const dYMD = convertDMYtoYMD(d.FechaLimpia);
+                    return dYMD >= dateDesde;
+                });
+            }
+            if (dateHasta) {
+                baseFilteredData = baseFilteredData.filter(d => {
+                    const dYMD = convertDMYtoYMD(d.FechaLimpia);
+                    return dYMD <= dateHasta;
+                });
             }
             if (selectedCobertura !== 'Todas') {
                 baseFilteredData = baseFilteredData.filter(d => d.CoberturaLimpia === selectedCobertura);
@@ -1038,7 +1081,11 @@
             const idxEco = document.getElementById('ratioEcoCons').innerText;
             const idxAmbos = document.getElementById('ratioAmbosCons').innerText;
             
-            const dateF = document.getElementById('dateFilter').value;
+            const dateDesde = document.getElementById('dateDesde').value;
+            const dateHasta = document.getElementById('dateHasta').value;
+            const dateText = (dateDesde || dateHasta)
+                ? `${dateDesde || 'Inicio'} al ${dateHasta || 'Fin'}`
+                : 'Todos';
             const claseF = document.getElementById('claseFilter').value;
             const cobF = document.getElementById('coberturaFilter').value;
             const tipoF = document.getElementById('tipoFilter').value;
@@ -1074,7 +1121,7 @@
                 
                 <div class="filters">
                     <strong>Filtros aplicados:</strong><br>
-                    Día: ${dateF} | Tipo de Consulta: ${tipoF} | Clase: ${claseF} | Cobertura: ${cobF}
+                    Período: ${dateText} | Tipo de Consulta: ${tipoF} | Clase: ${claseF} | Cobertura: ${cobF}
                 </div>
 
                 <div class="metrics">
