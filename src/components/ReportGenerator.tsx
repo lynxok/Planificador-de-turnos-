@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { supabase } from '../supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
+const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 import { 
   Calendar, 
   FileSpreadsheet, 
