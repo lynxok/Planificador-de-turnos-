@@ -16,19 +16,39 @@ interface ReportGeneratorProps {
   theme: any;
 }
 
+const FALLBACK_PROFESSIONALS = [
+  'OBAID, LUIS MARCELO',
+  'OBAID ANA FLORENCIA',
+  'RIAL PEDRO JAVIER',
+  'BARBERO CARLOS JULIAN',
+  'CRESPO FERNANDO ADRIAN',
+  'RIAL MARIA JOSE',
+  'MENDOZA MARIA VIVIANA',
+  'LIMONGI MERCEDES',
+  'BRUNO DELFINA MARIA',
+  'CASTILLO MARTIN',
+  'PEREZLINDO LUCAS OSCAR',
+  'GOLPE LUCIO',
+  'DE LEON MIGUEL ARIEL',
+  'FERNANDEZ MARIANO',
+  'SOLANAS LUIS DANIEL'
+];
+
 export function ReportGenerator({ theme }: ReportGeneratorProps) {
-  const [professionals, setProfessionals] = useState<string[]>([]);
-  const [selectedProf, setSelectedProf] = useState<string>('');
+  const [professionals, setProfessionals] = useState<string[]>(FALLBACK_PROFESSIONALS);
+  const [selectedProf, setSelectedProf] = useState<string>('OBAID, LUIS MARCELO');
   const [startDate, setStartDate] = useState<string>('2026-04-01');
   const [endDate, setEndDate] = useState<string>('2026-07-22');
   const [reportData, setReportData] = useState<any[]>([]);
   const [loadingProfs, setLoadingProfs] = useState<boolean>(true);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProfessionals() {
       try {
         setLoadingProfs(true);
+        setLoadError(null);
         // Consultamos la tabla de mapeo de profesionales únicos
         const { data, error } = await supabase
           .from('turnera_profesionales')
@@ -42,17 +62,21 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
           new Set((data || []).map(p => String(p.profesional).trim()))
         ).filter(p => p !== '' && p !== 'null');
 
-        setProfessionals(uniqueProfs);
-        
-        // Seleccionar por defecto a Marcelo Obaid si existe en la lista
-        const defaultProf = uniqueProfs.find(p => p.toUpperCase().includes('OBAID') && p.toUpperCase().includes('MARCELO'));
-        if (defaultProf) {
-          setSelectedProf(defaultProf);
-        } else if (uniqueProfs.length > 0) {
-          setSelectedProf(uniqueProfs[0]);
+        if (uniqueProfs.length > 0) {
+          setProfessionals(uniqueProfs);
+          
+          // Seleccionar por defecto a Marcelo Obaid si existe en la lista
+          const defaultProf = uniqueProfs.find(p => p.toUpperCase().includes('OBAID') && p.toUpperCase().includes('MARCELO'));
+          if (defaultProf) {
+            setSelectedProf(defaultProf);
+          } else {
+            setSelectedProf(uniqueProfs[0]);
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error al cargar profesionales:", err);
+        setLoadError(err.message || String(err));
+        // Mantenemos la lista de fallback
       } finally {
         setLoadingProfs(false);
       }
@@ -157,9 +181,16 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       {/* Filter Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-slate-900/45 p-4 rounded-2xl border border-slate-800/80">
         {/* Professional Select */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Profesional Médico</label>
-          {loadingProfs ? (
+        <div className="flex flex-col gap-1.5 col-span-1 md:col-span-1">
+          <div className="flex items-center justify-between w-full">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Profesional Médico</label>
+            {loadError && (
+              <span className="text-[9px] font-bold text-amber-500 cursor-help" title={`Error de red Supabase. Usando médicos locales: ${loadError}`}>
+                ⚠️ Local
+              </span>
+            )}
+          </div>
+          {loadingProfs && professionals.length === 0 ? (
             <div className="flex items-center gap-2 text-xs text-slate-400 py-2.5">
               <RefreshCw className="animate-spin text-indigo-400" size={13} />
               <span>Cargando médicos...</span>
@@ -171,7 +202,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
               className="w-full px-3 py-2 text-xs font-semibold bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none focus:border-indigo-500 cursor-pointer transition-colors"
             >
               {professionals.map((prof) => (
-                <option key={prof} value={prof}>
+                <option key={prof} value={prof} className="bg-slate-950 text-white py-1">
                   {prof}
                 </option>
               ))}
