@@ -26,6 +26,7 @@ import { DemandCalculatorModal } from './components/DemandCalculatorModal';
 import { AttendanceTrackerModal } from './components/AttendanceTrackerModal';
 import { ThemeSelectorPopover } from './components/ThemeSelectorPopover';
 import { StaffManagement } from './components/StaffManagement';
+import { ReportGenerator } from './components/ReportGenerator';
 import { THEMES } from './themes';
 
 // Icons
@@ -87,7 +88,7 @@ export default function App() {
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff' | 'reports'>('day');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [showResourceSidebar, setShowResourceSidebar] = useState<boolean>(true);
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState<boolean>(false);
@@ -1156,6 +1157,19 @@ export default function App() {
             <Users size={16} />
             {isSidebarExpanded && <span>Gestión de Personal</span>}
           </button>
+
+          <button
+            onClick={() => setViewMode('reports')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'reports'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Extractor de Reportes"
+          >
+            <FileSpreadsheet size={16} />
+            {isSidebarExpanded && <span>Extractor Reportes</span>}
+          </button>
         </div>
 
         {/* Sidebar Footer (Theme Settings trigger) */}
@@ -1183,7 +1197,7 @@ export default function App() {
         <header className={`${activeTheme.headerBg} ${activeTheme.headerBorder} ${activeTheme.headerText} px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-4 sticky top-0 z-40 shrink-0 transition-colors duration-300 shadow-sm`}>
           <div className="flex flex-col">
             <h1 className="text-base font-extrabold tracking-tight">
-              {viewMode === 'day' ? 'Planificador Diario' : viewMode === 'week' ? 'Planificador Semanal' : viewMode === 'analysis' ? 'Análisis Estadístico e Histórico' : 'Módulo de Gestión de Personal'}
+              {viewMode === 'day' ? 'Planificador Diario' : viewMode === 'week' ? 'Planificador Semanal' : viewMode === 'analysis' ? 'Análisis Estadístico e Histórico' : viewMode === 'reports' ? 'Extractor de Reportes Personalizados' : 'Módulo de Gestión de Personal'}
             </h1>
             <p className={`text-[10px] ${activeTheme.headerSubtext}`}>
               {activeMonthName} {currentYear} • {persons.length} Colaboradores
@@ -1288,7 +1302,7 @@ export default function App() {
                 <span>Importar Excel</span>
               </button>
 
-              {viewMode !== 'analysis' && viewMode !== 'staff' && (
+              {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && (
                 <>
                   <button
                     onClick={handleAutoBalanceCoverage}
@@ -1323,7 +1337,7 @@ export default function App() {
         </header>
 
         {/* 2. Interactive Month Date Navigator bar */}
-        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+        {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && (
           <div className={`${activeTheme.cardBg} ${activeTheme.cardBorder} border-b py-2 px-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 transition-colors duration-300`}>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center bg-slate-100 border border-slate-200/80 p-1 rounded-xl shadow-xs">
@@ -1401,7 +1415,7 @@ export default function App() {
         )}
 
         {/* Calendar Days Horizon Carousel */}
-        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+        {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && (
           <div className="px-6 py-2 border-b border-slate-150 shrink-0 bg-white">
             <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar">
               {monthDays.map((day: CalendarDay) => {
@@ -1535,6 +1549,8 @@ export default function App() {
               onDeletePerson={handleDeletePersonFromDb}
               theme={activeTheme}
             />
+          ) : viewMode === 'reports' ? (
+            <ReportGenerator theme={activeTheme} />
           ) : (
             <>
               {/* Left column: People sidebar (Manage resources) - Colapsable */}
