@@ -30,6 +30,12 @@ Se implementó un sistema para importar citas de pacientes desde un servidor FTP
   * Botón 🕒 de historial que despliega [SyncLogsModal.tsx](file:///c:/Users/ignac/OneDrive/LYNX/Turnos/src/components/SyncLogsModal.tsx) con los últimos 15 registros de sincronización.
   * El botón actualizador en [App.tsx](file:///c:/Users/ignac/OneDrive/LYNX/Turnos/src/App.tsx) corre localmente descargando el archivo o, en producción, realiza un fallback disparando la función RPC `trigger_github_sync()` para iniciar el workflow de GitHub de manera remota.
 
+
+## 5. Corrección de API Keys de Supabase y Sincronización Local / Producción
+Se resolvieron dos problemas críticos que impedían la carga y sincronización de datos de demanda:
+* **Clave API de Supabase Válida:** Se identificó que la clave `anon` anterior estaba truncada e incompleta, provocando errores de autenticación silenciosos y arrays vacíos en la interfaz. Se reemplazó en todo el proyecto por la clave pública activa (`sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC`).
+* **Sincronización del Backend Local:** Se corrigió el backend de desarrollo (`backend/server.ts`), que apuntaba a un proyecto de Supabase obsoleto/incorrecto (`fwsnaasfxfzacchsyijx`), re-apuntándolo al proyecto de producción (`wbguwmbwutvhqsirtjps`) e inicializando el cliente con el esquema `control_de_horas` requerido para las consultas a tablas.
+* **Mapeo del Área de Demanda:** Se modificó la inicialización del área del mapa de demanda en el frontend (`src/api.ts`) a `area: 'Admision'` (anteriormente vacío `''`), garantizando que la grilla del modelador y el simulador de Erlang C encuentren los registros diarios de Admisión.
+
 ---
-*Última actualización: 26 de Junio, 2026 (Sincronización FTP e Integración GitHub).*
-*
+*Última actualización: 26 de Junio, 2026 (Sincronización FTP, Corrección de API Keys e Integración GitHub).*

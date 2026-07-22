@@ -81,7 +81,7 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
       if (!demandMap[dateStr]) {
         demandMap[dateStr] = {
           dateString: dateStr,
-          area: '', // will be matched by date only in CoverageChart
+          area: 'Admision', // defaulted to Admision to match backend
           hourlyRequirements: Array(24).fill(0),
           hourlyArtPatients: Array(24).fill(0),
           hourlyOsPatients: Array(24).fill(0)

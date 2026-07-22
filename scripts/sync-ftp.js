@@ -25,7 +25,7 @@ const FTP_CONFIG = {
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IndiZ3V3bWJ3dXR2aHFzaXJ0anBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5Nzg1OTYsImV4cCI6MjA4MzU1NDU5Nn0.tiqGxp4BxqoI7P_jasfZORWjIyvqCbIcwvk9Elmzoa8';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

@@ -24,9 +24,11 @@ const FTP_CONFIG = {
 };
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://fwsnaasfxfzacchsyijx.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c25hYXNmeGZ6YWNjaHN5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzkxMzksImV4cCI6MjA5MDExNTEzOX0.I9QYbMGbk53SnkfZW7ixICNW9xnUahaRxAKDPK9Vo90';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
