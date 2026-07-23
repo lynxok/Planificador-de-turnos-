@@ -24,6 +24,7 @@ interface ReportGeneratorProps {
 }
 
 const FALLBACK_PROFESSIONALS = [
+  'TODOS LOS PROFESIONALES',
   'OBAID, LUIS MARCELO',
   'OBAID ANA FLORENCIA',
   'RIAL PEDRO JAVIER',
@@ -70,14 +71,15 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
         ).filter(p => p !== '' && p !== 'null');
 
         if (uniqueProfs.length > 0) {
-          setProfessionals(uniqueProfs);
+          const fullProfsList = ['TODOS LOS PROFESIONALES', ...uniqueProfs];
+          setProfessionals(fullProfsList);
           
           // Seleccionar por defecto a Marcelo Obaid si existe en la lista
           const defaultProf = uniqueProfs.find(p => p.toUpperCase().includes('OBAID') && p.toUpperCase().includes('MARCELO'));
           if (defaultProf) {
             setSelectedProf(defaultProf);
           } else {
-            setSelectedProf(uniqueProfs[0]);
+            setSelectedProf(fullProfsList[0]);
           }
         }
       } catch (err: any) {
@@ -102,13 +104,17 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       setGenerating(true);
       console.log(`Buscando citas para: ${selectedProf} en rango ${startDate} a ${endDate}`);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('planning_patient_appointments')
         .select('*')
-        .eq('profesional', selectedProf)
         .gte('turno', `${startDate}T00:00:00`)
-        .lte('turno', `${endDate}T23:59:59`)
-        .order('turno', { ascending: true });
+        .lte('turno', `${endDate}T23:59:59`);
+
+      if (selectedProf !== 'TODOS LOS PROFESIONALES') {
+        query = query.eq('profesional', selectedProf);
+      }
+
+      const { data, error } = await query.order('turno', { ascending: true });
 
       if (error) throw error;
 
@@ -153,7 +159,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Turnos");
       
       // Sanitizar el nombre del profesional para el nombre del archivo
-      const safeName = selectedProf.replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = selectedProf === 'TODOS LOS PROFESIONALES' ? 'Todos_Profesionales' : selectedProf.replace(/[^a-zA-Z0-9]/g, '_');
       XLSX.writeFile(workbook, `Reporte_${safeName}_${startDate}_a_${endDate}.xlsx`);
     } catch (err: any) {
       console.error("Error al exportar a Excel:", err);
@@ -453,6 +459,9 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
                   <tr className="bg-slate-950 sticky top-0 z-10 border-b border-slate-800/80">
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Hora</th>
+                    {selectedProf === 'TODOS LOS PROFESIONALES' && (
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Profesional</th>
+                    )}
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Paciente</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Obra Social / Cobertura</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">¿Asistió?</th>
@@ -477,6 +486,11 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
                       <tr key={row.id || idx} className="hover:bg-slate-900/40 transition-colors">
                         <td className="px-4 py-2.5 text-xs font-bold text-slate-300">{fecha}</td>
                         <td className="px-4 py-2.5 text-xs font-bold text-slate-400">{hora}</td>
+                        {selectedProf === 'TODOS LOS PROFESIONALES' && (
+                          <td className="px-4 py-2.5 text-xs font-extrabold text-indigo-400 truncate max-w-[145px]" title={row.profesional}>
+                            {row.profesional}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5 text-xs font-extrabold text-white">{row.paciente}</td>
                         <td className="px-4 py-2.5 text-xs font-semibold text-slate-400">{row.cobertura || 'Sin obra social'}</td>
                         <td className="px-4 py-2.5 text-center">
