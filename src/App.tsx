@@ -326,6 +326,46 @@ export default function App() {
     }
   };
 
+  const handleLoadPrimaryShifts = () => {
+    let loadedCount = 0;
+    const newShifts = [...shifts];
+
+    // Iteramos personas
+    persons.forEach(person => {
+      // 1. Filtrar si la persona pertenece al área activa (si no es 'Todos')
+      if (activeArea !== 'Todos' && person.area !== activeArea) return;
+
+      // 2. Verificar si la persona ya tiene algún turno (regular o ausencia de vacaciones/enfermedad) en este día
+      const hasShiftToday = newShifts.some(s => s.personId === person.id && s.date === activeDate);
+      if (hasShiftToday) return; // Si ya está asignada o ausente, la ignoramos
+
+      // 3. Cargar el turno principal (el primero de possibleShifts)
+      if (person.possibleShifts && person.possibleShifts.length > 0) {
+        const primary = person.possibleShifts[0];
+        const newShiftId = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        
+        newShifts.push({
+          id: newShiftId,
+          personId: person.id,
+          date: activeDate,
+          startHour: primary.startHour,
+          duration: primary.duration,
+          area: person.area
+        });
+        loadedCount++;
+      }
+    });
+
+    if (loadedCount > 0) {
+      setShifts(newShifts);
+      saveToLocalStorage(persons, newShifts, targets);
+      setHasUnsavedChanges(true);
+      alert(`¡Carga Exitosa! Se cargaron los turnos principales para ${loadedCount} personas en el día ${activeDate}. Recuerda guardar los cambios.`);
+    } else {
+      alert("No se cargaron nuevos turnos. Todos los integrantes activos del área ya tienen turnos asignados (o ausencias registradas) para hoy.");
+    }
+  };
+
   // 5. Operations handlers
   const handleUpdateShift = (shiftId: string, updatedFields: Partial<Shift>): boolean => {
     const currentShift = shifts.find((s) => s.id === shiftId);
@@ -1267,6 +1307,15 @@ export default function App() {
                 </button>
               </div>
 
+              <button
+                onClick={handleLoadPrimaryShifts}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-indigo-500/30"
+                title="Carga el primer turno predefinido para todo el personal que esté libre hoy"
+              >
+                <Sparkles size={13} className="text-indigo-150 animate-pulse" />
+                <span>Cargar Principales</span>
+              </button>
+
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1756,7 +1805,7 @@ export default function App() {
         preselectedPersonId={preselectedPersonId}
         onSave={handleSaveModalShift}
         onDelete={modalShift ? () => handleDeleteShift(modalShift.id) : undefined}
-        areas={activeAreasList}
+        areas={[...activeAreasList, 'VACACIONES', 'ENFERMEDAD']}
       />
 
       <ExcelImporterModal

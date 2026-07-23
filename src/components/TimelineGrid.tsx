@@ -389,108 +389,147 @@ export function TimelineGrid({
                         };
 
                         const isOvernight = shift.startHour + shift.duration > 24;
+                        const isAbsence = shift.area === 'VACACIONES' || shift.area === 'ENFERMEDAD' || shift.area === 'ENFERMO';
+
+                        // Custom style for absence background repeating patterns
+                        const customStyle: React.CSSProperties = {
+                          left: `${startPct}%`,
+                          width: `${widthPct}%`,
+                          minWidth: '40px'
+                        };
+
+                        let customBg = palette.bg;
+                        let customBorder = isOvernight ? 'border-amber-400 ring-1 ring-amber-300/30' : '';
+
+                        if (shift.area === 'VACACIONES') {
+                          customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #475569, #475569 8px, #334155 8px, #334155 16px)';
+                          customBg = 'text-white';
+                          customBorder = 'border-slate-500 shadow-md';
+                        } else if (shift.area === 'ENFERMEDAD' || shift.area === 'ENFERMO') {
+                          customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #dc2626, #dc2626 8px, #991b1b 8px, #991b1b 16px)';
+                          customBg = 'text-white';
+                          customBorder = 'border-red-650 shadow-md';
+                        }
 
                         return (
                           <div
                             key={shift.id}
                             id={`shift-${shift.id}`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, shift.id)}
-                            onDragEnd={() => handleDragEnd(shift.id)}
-                            className={`absolute top-2 bottom-2 rounded-lg shadow-sm font-sans flex flex-col justify-center px-2 py-1 select-none cursor-grab active:cursor-grabbing border transition-transform duration-100 group/shift hover:-translate-y-0.5 z-10 ${palette.bg} ${
-                              isOvernight ? 'border-amber-400 ring-1 ring-amber-300/30' : ''
-                            }`}
-                            style={{
-                              left: `${startPct}%`,
-                              width: `${widthPct}%`,
-                              minWidth: '40px'
-                            }}
+                            draggable={!isAbsence}
+                            onDragStart={(e) => !isAbsence && handleDragStart(e, shift.id)}
+                            onDragEnd={() => !isAbsence && handleDragEnd(shift.id)}
+                            className={`absolute top-2 bottom-2 rounded-lg shadow-sm font-sans flex flex-col justify-center px-2 py-1 select-none border transition-transform duration-100 group/shift hover:-translate-y-0.5 z-10 ${
+                              isAbsence ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+                            } ${customBg} ${customBorder}`}
+                            style={customStyle}
                           >
-                            {/* Inner shift information line */}
-                            <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-bold">
-                              <span className="truncate">
-                                {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.duration)}
-                              </span>
-                              
-                              {/* Hover actions */}
-                              <div className="opacity-0 group-hover/shift:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-slate-900/80 px-1 py-0.5 rounded ml-1 text-white">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); onSelectShift(shift); }}
-                                  className="p-0.5 hover:text-indigo-200 cursor-pointer"
-                                  title="Editar Turno"
-                                >
-                                  <Edit2 size={9} />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); onDeleteShift(shift.id); }}
-                                  className="p-0.5 hover:text-rose-200 cursor-pointer"
-                                  title="Borrar Turno"
-                                >
-                                  <Trash2 size={9} />
-                                </button>
+                            {isAbsence ? (
+                              <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-black text-white px-0.5">
+                                <span className="truncate flex items-center gap-1">
+                                  {shift.area === 'VACACIONES' ? '🏝️ VACACIONES' : '🤒 ENFERMEDAD'}
+                                </span>
+                                
+                                <div className="opacity-0 group-hover/shift:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-slate-950/80 px-1 py-0.5 rounded text-white">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onSelectShift(shift); }}
+                                    className="p-0.5 hover:text-indigo-200 cursor-pointer"
+                                    title="Editar Estado"
+                                  >
+                                    <Edit2 size={9} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onDeleteShift(shift.id); }}
+                                    className="p-0.5 hover:text-rose-200 cursor-pointer"
+                                    title="Eliminar Ausencia"
+                                  >
+                                    <Trash2 size={9} />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-bold">
+                                  <span className="truncate">
+                                    {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.duration)}
+                                  </span>
+                                  
+                                  <div className="opacity-0 group-hover/shift:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-slate-900/80 px-1 py-0.5 rounded ml-1 text-white">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onSelectShift(shift); }}
+                                      className="p-0.5 hover:text-indigo-200 cursor-pointer"
+                                      title="Editar Turno"
+                                    >
+                                      <Edit2 size={9} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onDeleteShift(shift.id); }}
+                                      className="p-0.5 hover:text-rose-200 cursor-pointer"
+                                      title="Borrar Turno"
+                                    >
+                                      <Trash2 size={9} />
+                                    </button>
+                                  </div>
+                                </div>
 
-                            {/* Resize adjusting handles built inside card */}
-                            <div className="flex items-center justify-between w-full mt-0.5 text-[8px] opacity-100 select-none">
-                              {/* Quick left/right shifting controls for finer precision */}
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextStart = Math.max(0, shift.startHour - 0.5);
-                                    onUpdateShift(shift.id, { startHour: nextStart });
-                                  }}
-                                  className="text-[10px] bg-white/20 hover:bg-white/30 px-0.5 rounded cursor-pointer font-bold select-none text-white"
-                                  title="Mover inicio -30 min"
-                                >
-                                  ‹
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextStart = Math.min(23.5, shift.startHour + 0.5);
-                                    if (nextStart + shift.duration <= 48) { // allow shifting overnight shifts
-                                      onUpdateShift(shift.id, { startHour: nextStart });
-                                    }
-                                  }}
-                                  className="text-[10px] bg-white/20 hover:bg-white/30 px-0.5 rounded cursor-pointer font-bold select-none text-white"
-                                  title="Mover inicio +30 min"
-                                >
-                                  ›
-                                </button>
-                              </div>
+                                <div className="flex items-center justify-between w-full mt-0.5 text-[8px] opacity-100 select-none">
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextStart = Math.max(0, shift.startHour - 0.5);
+                                        onUpdateShift(shift.id, { startHour: nextStart });
+                                      }}
+                                      className="text-[10px] bg-white/20 hover:bg-white/30 px-0.5 rounded cursor-pointer font-bold select-none text-white"
+                                      title="Mover inicio -30 min"
+                                    >
+                                      ‹
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextStart = Math.min(23.5, shift.startHour + 0.5);
+                                        if (nextStart + shift.duration <= 48) {
+                                          onUpdateShift(shift.id, { startHour: nextStart });
+                                        }
+                                      }}
+                                      className="text-[10px] bg-white/20 hover:bg-white/30 px-0.5 rounded cursor-pointer font-bold select-none text-white"
+                                      title="Mover inicio +30 min"
+                                    >
+                                      ›
+                                    </button>
+                                  </div>
 
-                              <span className={`${palette.text} font-medium tracking-tight text-[8px] flex items-center gap-0.5`}>
-                                {shift.duration}h {isOvernight && '🌙'}
-                              </span>
+                                  <span className={`${palette.text} font-medium tracking-tight text-[8px] flex items-center gap-0.5`}>
+                                    {shift.duration}h {isOvernight && '🌙'}
+                                  </span>
 
-                              {/* Duration expanding controls */}
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextDur = Math.max(1, shift.duration - 0.5);
-                                    onUpdateShift(shift.id, { duration: nextDur });
-                                  }}
-                                  className="text-[10px] bg-slate-900/30 hover:bg-slate-900/50 px-0.5 rounded cursor-pointer text-white"
-                                  title="Acortar duración -30 min"
-                                >
-                                  -
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextDur = Math.min(24, shift.duration + 0.5);
-                                    onUpdateShift(shift.id, { duration: nextDur });
-                                  }}
-                                  className="text-[10px] bg-slate-900/30 hover:bg-slate-900/50 px-0.5 rounded cursor-pointer text-white"
-                                  title="Extender duración +30 min"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextDur = Math.max(1, shift.duration - 0.5);
+                                        onUpdateShift(shift.id, { duration: nextDur });
+                                      }}
+                                      className="text-[10px] bg-slate-900/30 hover:bg-slate-900/50 px-0.5 rounded cursor-pointer text-white"
+                                      title="Acortar duración -30 min"
+                                    >
+                                      -
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextDur = Math.min(24, shift.duration + 0.5);
+                                        onUpdateShift(shift.id, { duration: nextDur });
+                                      }}
+                                      className="text-[10px] bg-slate-900/30 hover:bg-slate-900/50 px-0.5 rounded cursor-pointer text-white"
+                                      title="Extender duración +30 min"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
                         );
                       })}
