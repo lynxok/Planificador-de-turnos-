@@ -339,9 +339,9 @@ export default function App() {
       const hasShiftToday = newShifts.some(s => s.personId === person.id && s.date === activeDate);
       if (hasShiftToday) return; // Si ya está asignada o ausente, la ignoramos
 
-      // 3. Cargar el turno principal (el primero de possibleShifts)
+      // 3. Cargar el turno principal (marcado con isPrimary, o el primero por defecto)
       if (person.possibleShifts && person.possibleShifts.length > 0) {
-        const primary = person.possibleShifts[0];
+        const primary = person.possibleShifts.find(ps => ps.isPrimary) || person.possibleShifts[0];
         const newShiftId = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
         
         newShifts.push({
