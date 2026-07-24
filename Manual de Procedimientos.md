@@ -82,34 +82,65 @@ Al presionar el botón **"Actualizador de turnos"** en la interfaz:
 * **Proceso**: El botón cambiará de estado a **"Actualizando..."** y el ícono comenzará a girar. Durante este tiempo el servidor realiza de forma invisible toda la descarga FTP e importación a Supabase.
 * **Fallback Interactivo**: Si el servidor backend integrado no estuviera encendido, el sistema capturará el error de red y te ofrecerá de forma interactiva la opción de hacer una sincronización manual subiendo directamente un archivo Excel local desde tu computadora.
 
-### 4.2. Gráficos de Frecuencia con Agrupamiento Horario (HH:00)
-* En la pestaña **"Análisis Estadístico e Histórico"**, el gráfico de barra de frecuencias horarias agrupa automáticamente las citas por horas completas.
-* *Ejemplo:* Si tienes citas programadas a las `13:00`, `13:15` y `13:30`, todas se agruparán dentro de la barra de la hora **`13:00`**, permitiendo ver de manera clara e intuitiva los picos reales de demanda por hora en la clínica.
+### 4.2. Botón "Cargar Principales" (Asignación Automática Inteligente)
+* **Ubicación**: En el encabezado superior derecho, dentro del menú de **`🛠️ Herramientas`**.
+* **Proceso**: Escanea a todos los colaboradores del departamento activo en el día seleccionado. Si no cuentan con turnos asignados ni ausencias programadas, les genera de forma automática un turno de trabajo real aplicando el horario que el usuario haya tildado como **⭐️ Principal** en su ficha.
 
-### 4.3. Selección de Temas Estéticos
+### 4.3. Registro de Ausencias (Vacaciones y Enfermedad)
+* **Atajos Rápidos**: Al programar un turno en el modal de edición, cuentas con los botones **`🏝️ Vacaciones`** y **`🤒 Enfermedad`**.
+* **Configuración Automática**: Al hacer clic en uno de ellos, el sistema configura el turno para que dure 24 horas y le asigna el área especial correspondiente.
+* **Aspecto Visual en Turnera**: Se dibujan bloques completos con rayas diagonales degradadas:
+  * **Vacaciones**: Fondo rayado gris oscuro con etiqueta `🏝️ VACACIONES`.
+  * **Enfermedad**: Fondo rayado rojo con etiqueta `🤒 ENFERMEDAD / LICENCIA`.
+* **Seguridad**: Estos bloques de ausencia están bloqueados para edición rápida (drag/resize) y previenen automáticamente que el botón de carga de principales les asigne turnos de trabajo, asegurando que se respete la licencia del personal.
+
+### 4.4. Selección de Temas Estéticos
 El sistema cuenta con un catálogo de **11 temas de color estéticos** ajustables desde el menú lateral izquierdo (botón con ícono de paleta ⚙️/🎨).
 Se añadieron los siguientes temas premium solicitados por el usuario:
 * **Vichy**: Un estilo corporativo basado en tonos teal/verde azulado y grises profesionales.
 * **Sorbet**: Una estética otoñal cálida con combinación de verde salvia y rosa viejo/mauve.
 * **Frozen Mist**: Una paleta de alto contraste con acentos naranja vibrantes sobre grises y aceituna oscuro.
 
-### 4.4. Scroll Único de Página Completa
+### 4.5. Scroll Único de Página Completa
 * La cuadrícula de turnos se dibuja en su totalidad de arriba a abajo.
 * No existen barras de desplazamiento vertical internas dentro de la grilla. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
 * El **Monitor de Cobertura y Densidad** se ubica al pie de la página, accesible deslizando la página web hacia abajo.
 
 ---
 
-## 5. Procedimiento de Operación Diario y Mantenimiento
+## 5. Módulo de Reportes, Dashboards y Filtros Avanzados
 
-### 5.1. Arrancar el Planificador
-* **Iniciar el Planificador**: Ejecuta el archivo `Iniciar_Planificador_Oculto.vbs` o `Iniciar_Planificador.bat` in la raíz. Esto levantará los servidores backend y abrirá automáticamente tu navegador en `http://localhost:3021` (o en `http://localhost:3020` en modo desarrollo).
+El sistema integra un completo generador de reportes consolidado y dashboards estadísticos dinámicos:
+
+### 5.1. Dashboards de Análisis con Filtro Desde-Hasta
+* **Ubicación**: En la pestaña **`Análisis de Turnera`**.
+* **Filtros Interactivos**: Reemplaza el selector de fecha única por dos campos de fecha interactivos (`Desde` y `Hasta`). Al modificarse, todos los KPI's, gráficos de Chart.js y análisis de frecuencias se recalculan en tiempo real para el rango de fechas seleccionado.
+* **Exportación a PDF**: El generador de informes en PDF declara automáticamente el rango de fechas seleccionado en el encabezado del documento impreso.
+
+### 5.2. Reportes con Gráficos Nativos Premium
+* **Gráfico de Embudo (Funnel) de Obras Sociales**: Muestra el Top 5 de atenciones confirmadas por cobertura, ordenadas jerárquicamente con barras horizontales de ancho proporcional y degradados, acompañadas de tooltips.
+* **Histograma de Frecuencia por Día**: Un gráfico cronológico con barras verticales que ilustra el volumen de turnos por fecha. Cuenta con scroll horizontal adaptativo para soportar de forma legible análisis de largos períodos.
+* **Opción "Todos los Profesionales"**: En el selector de profesionales del generador de reportes, se puede elegir `'TODOS LOS PROFESIONALES'`. Esto consolida las estadísticas de la clínica completa y añade dinámicamente la columna **"Profesional"** en la grilla de datos del reporte.
+
+---
+
+## 6. Procedimiento de Operación Diario y Mantenimiento
+
+### 6.1. Arrancar el Planificador
+* **Iniciar el Planificador**: Ejecuta el archivo `Iniciar_Planificador_Oculto.vbs` o `Iniciar_Planificador.bat` en la raíz. Esto levantará los servidores backend y abrirá automáticamente tu navegador en `http://localhost:3021` (o en `http://localhost:3020` en modo desarrollo).
 * **Detener el Planificador**: Ejecuta el archivo `Detener_Planificador.bat` en la raíz para cerrar de forma segura todos los procesos colgados de Node.js o Vite y liberar los puertos.
 
-### 5.2. Copias de Seguridad de Versiones (`Versiones anteriores`)
-Antes de cada compilación de distribución (`npm run build`) o cambios críticos, se realiza una copia de seguridad del directorio `dist/` a la carpeta `Versiones anteriores/` asignándole un nombre de versión descriptivo (ej. `dist_pre_automatic_sync_button`).
+### 6.2. Configuración del Horario Principal de Colaboradores
+1. Ve al menú lateral izquierdo y selecciona **`Gestión de Personal`**.
+2. Haz clic en **Editar** (icono de lápiz ✏️) en el colaborador deseado.
+3. Desplázate al pie del modal hasta la sección **`Plantillas de Turnos Posibles`**.
+4. Cada turno posible posee una casilla circular de tipo **Radio Button**. Haz clic en el círculo del turno que deseas marcar como **⭐️ Principal**.
+5. Presiona **`Guardar Cambios`** para registrar la prioridad en Supabase.
 
-### 5.3. Gestión de Repositorios (Git Multi-Remoto)
+### 6.3. Copias de Seguridad de Versiones (`Versiones anteriores`)
+Antes de cada compilación de distribución (`npm run build`) o cambios críticos, se realiza una copia de seguridad del directorio `dist/` a la carpeta `Versiones anteriores/` asignándole un nombre de versión descriptivo (ej. `dist_pre_primary_radio_indicator_2026_07_23`).
+
+### 6.4. Gestión de Repositorios (Git Multi-Remoto)
 El código fuente de este proyecto se gestiona de forma centralizada en dos repositorios remotos:
 1. **`origin`**: Repositorio principal de desarrollo (`https://github.com/AstudillaJS/Planificador-de-turnos.git`).
 2. **`lynxok`**: Repositorio de la organización/cuenta Lynx (`https://github.com/lynxok/Planificador-de-turnos-.git`).
