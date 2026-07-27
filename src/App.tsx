@@ -1558,7 +1558,7 @@ export default function App() {
                   <span className={`text-xs font-bold ${activeTheme.cardText} font-sans`}>Reporte Estadístico e Histórico Consolidador</span>
                 </div>
                 <a 
-                  href={`./analisis_turnos.html?theme=${activeThemeId}`} 
+                  href={`./analisis_turnos.html?v=1.1.2&theme=${activeThemeId}`} 
                   target="_blank" 
                   rel="noreferrer"
                   className={`text-[11px] font-bold ${activeTheme.themeHighlightText} hover:opacity-80 flex items-center gap-1 transition-colors`}
@@ -1567,7 +1567,7 @@ export default function App() {
                 </a>
               </div>
               <iframe 
-                src={`./analisis_turnos.html?theme=${activeThemeId}`} 
+                src={`./analisis_turnos.html?v=1.1.2&theme=${activeThemeId}`} 
                 className="w-full border-0 rounded-b-2xl" 
                 style={{ height: '1700px' }}
                 scrolling="no"

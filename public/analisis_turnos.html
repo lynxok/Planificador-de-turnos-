@@ -639,6 +639,14 @@
         let asistenciaChartInst = null;
         let tipoConsultaChartInst = null;
 
+        // Helper to convert DD/MM/YYYY to YYYY-MM-DD (Global scope)
+        function convertDMYtoYMD(dmy) {
+            if (!dmy) return '';
+            const parts = dmy.split('/');
+            if (parts.length !== 3) return '';
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+
         // Detect and apply theme dynamically before running anything
         function applyTheme() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -719,14 +727,6 @@
                 if (r.CoberturaLimpia) coberturas.add(r.CoberturaLimpia);
             });
 
-            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
-            function convertDMYtoYMD(dmy) {
-                if (!dmy) return '';
-                const parts = dmy.split('/');
-                if (parts.length !== 3) return '';
-                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
-
             // Sort dates chronologically: a and b are "DD/MM/YYYY"
             const sortedFechas = Array.from(fechas).sort((a, b) => {
                 const partsA = a.split('/');
@@ -738,18 +738,27 @@
             });
 
             if (sortedFechas.length > 0) {
-                const minDate = convertDMYtoYMD(sortedFechas[0]);
-                const maxDate = convertDMYtoYMD(sortedFechas[sortedFechas.length - 1]);
+                const absoluteMinDate = convertDMYtoYMD(sortedFechas[0]);
+                const maxDateStr = convertDMYtoYMD(sortedFechas[sortedFechas.length - 1]);
                 
+                // Para el minDate por defecto, restamos 30 días de la maxDate para evitar sobrecargar los gráficos
+                const maxDObj = new Date(maxDateStr + 'T00:00:00');
+                const minDObj = new Date(maxDObj.getTime() - (30 * 24 * 60 * 60 * 1000));
+                
+                const yyyy = minDObj.getFullYear();
+                const mm = String(minDObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(minDObj.getDate()).padStart(2, '0');
+                const defaultMinDate = `${yyyy}-${mm}-${dd}`;
+
                 const desdeInput = document.getElementById('dateDesde');
                 const hastaInput = document.getElementById('dateHasta');
                 if (desdeInput && hastaInput) {
-                    desdeInput.value = minDate;
-                    hastaInput.value = maxDate;
-                    desdeInput.min = minDate;
-                    desdeInput.max = maxDate;
-                    hastaInput.min = minDate;
-                    hastaInput.max = maxDate;
+                    desdeInput.value = defaultMinDate;
+                    hastaInput.value = maxDateStr;
+                    desdeInput.min = absoluteMinDate;
+                    desdeInput.max = maxDateStr;
+                    hastaInput.min = absoluteMinDate;
+                    hastaInput.max = maxDateStr;
                 }
             }
 
@@ -792,14 +801,6 @@
             const selectedClase = document.getElementById('claseFilter').value;
             const selectedTipo = document.getElementById('tipoFilter').value;
             const selectedMedico = document.getElementById('medicoFilter').value;
-
-            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
-            function convertDMYtoYMD(dmy) {
-                if (!dmy) return '';
-                const parts = dmy.split('/');
-                if (parts.length !== 3) return '';
-                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
 
             let baseFilteredData = rawData;
             if (dateDesde) {
