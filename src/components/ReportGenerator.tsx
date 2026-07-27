@@ -24,7 +24,7 @@ interface ReportGeneratorProps {
 }
 
 const FALLBACK_PROFESSIONALS = [
-  'TODOS LOS PROFESIONALES',
+  'TODOS',
   'OBAID, LUIS MARCELO',
   'OBAID ANA FLORENCIA',
   'RIAL PEDRO JAVIER',
@@ -44,7 +44,7 @@ const FALLBACK_PROFESSIONALS = [
 
 export function ReportGenerator({ theme }: ReportGeneratorProps) {
   const [professionals, setProfessionals] = useState<string[]>(FALLBACK_PROFESSIONALS);
-  const [selectedProf, setSelectedProf] = useState<string>('OBAID, LUIS MARCELO');
+  const [selectedProf, setSelectedProf] = useState<string>('TODOS');
   const [startDate, setStartDate] = useState<string>('2026-04-01');
   const [endDate, setEndDate] = useState<string>('2026-07-22');
   const [reportData, setReportData] = useState<any[]>([]);
@@ -71,16 +71,9 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
         ).filter(p => p !== '' && p !== 'null');
 
         if (uniqueProfs.length > 0) {
-          const fullProfsList = ['TODOS LOS PROFESIONALES', ...uniqueProfs];
+          const fullProfsList = ['TODOS', ...uniqueProfs];
           setProfessionals(fullProfsList);
-          
-          // Seleccionar por defecto a Marcelo Obaid si existe en la lista
-          const defaultProf = uniqueProfs.find(p => p.toUpperCase().includes('OBAID') && p.toUpperCase().includes('MARCELO'));
-          if (defaultProf) {
-            setSelectedProf(defaultProf);
-          } else {
-            setSelectedProf(fullProfsList[0]);
-          }
+          setSelectedProf('TODOS');
         }
       } catch (err: any) {
         console.error("Error al cargar profesionales:", err);
@@ -105,12 +98,12 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       console.log(`Buscando citas para: ${selectedProf} en rango ${startDate} a ${endDate}`);
       
       let query = supabase
-        .from('planning_patient_appointments')
-        .select('*')
-        .gte('turno', `${startDate}T00:00:00`)
-        .lte('turno', `${endDate}T23:59:59`);
+          .from('planning_patient_appointments')
+          .select('*')
+          .gte('turno', `${startDate}T00:00:00`)
+          .lte('turno', `${endDate}T23:59:59`);
 
-      if (selectedProf !== 'TODOS LOS PROFESIONALES') {
+      if (selectedProf !== 'TODOS' && selectedProf !== 'TODOS LOS PROFESIONALES') {
         query = query.eq('profesional', selectedProf);
       }
 
@@ -159,7 +152,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Turnos");
       
       // Sanitizar el nombre del profesional para el nombre del archivo
-      const safeName = selectedProf === 'TODOS LOS PROFESIONALES' ? 'Todos_Profesionales' : selectedProf.replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = (selectedProf === 'TODOS' || selectedProf === 'TODOS LOS PROFESIONALES') ? 'Todos_Profesionales' : selectedProf.replace(/[^a-zA-Z0-9]/g, '_');
       XLSX.writeFile(workbook, `Reporte_${safeName}_${startDate}_a_${endDate}.xlsx`);
     } catch (err: any) {
       console.error("Error al exportar a Excel:", err);
@@ -169,6 +162,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
 
   // KPIs
   const totalCitas = reportData.length;
+  const isAllProfs = selectedProf === 'TODOS' || selectedProf === 'TODOS LOS PROFESIONALES';
   const asistieronCount = reportData.filter(r => r.asistio === 1).length;
   const ausentesCount = totalCitas - asistieronCount;
   const asistieronPct = totalCitas > 0 ? ((asistieronCount / totalCitas) * 100).toFixed(1) : '0';
@@ -459,7 +453,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
                   <tr className="bg-slate-950 sticky top-0 z-10 border-b border-slate-800/80">
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Hora</th>
-                    {selectedProf === 'TODOS LOS PROFESIONALES' && (
+                    {isAllProfs && (
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Profesional</th>
                     )}
                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Paciente</th>
@@ -486,7 +480,7 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
                       <tr key={row.id || idx} className="hover:bg-slate-900/40 transition-colors">
                         <td className="px-4 py-2.5 text-xs font-bold text-slate-300">{fecha}</td>
                         <td className="px-4 py-2.5 text-xs font-bold text-slate-400">{hora}</td>
-                        {selectedProf === 'TODOS LOS PROFESIONALES' && (
+                        {isAllProfs && (
                           <td className="px-4 py-2.5 text-xs font-extrabold text-indigo-400 truncate max-w-[145px]" title={row.profesional}>
                             {row.profesional}
                           </td>
