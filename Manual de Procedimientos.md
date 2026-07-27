@@ -120,7 +120,7 @@ El sistema integra un completo generador de reportes consolidado y dashboards es
 ### 5.2. Reportes con Gráficos Nativos Premium
 * **Gráfico de Embudo (Funnel) de Obras Sociales**: Muestra el Top 5 de atenciones confirmadas por cobertura, ordenadas jerárquicamente con barras horizontales de ancho proporcional y degradados, acompañadas de tooltips.
 * **Histograma de Frecuencia por Día**: Un gráfico cronológico con barras verticales que ilustra el volumen de turnos por fecha. Cuenta con scroll horizontal adaptativo para soportar de forma legible análisis de largos períodos.
-* **Opción "Todos los Profesionales"**: En el selector de profesionales del generador de reportes, se puede elegir `'TODOS LOS PROFESIONALES'`. Esto consolida las estadísticas de la clínica completa y añade dinámicamente la columna **"Profesional"** en la grilla de datos del reporte.
+* **Opción "TODOS" (Por Defecto)**: En el selector de profesionales del generador de reportes, la opción **`'TODOS'`** se encuentra seleccionada por defecto al cargar el componente. Esto permite consolidar las estadísticas de la clínica completa e inyectar de inmediato una columna dinámica **"Profesional"** en la grilla de datos, eliminando la necesidad de seleccionar médicos manualmente para obtener un panorama global.
 
 ---
 
