@@ -116,6 +116,7 @@ El sistema integra un completo generador de reportes consolidado y dashboards es
 * **Ubicación**: En la pestaña **`Análisis de Turnera`**.
 * **Filtros Interactivos**: Reemplaza el selector de fecha única por dos campos de fecha interactivos (`Desde` y `Hasta`). Al modificarse, todos los KPI's, gráficos de Chart.js y análisis de frecuencias se recalculan en tiempo real para el rango de fechas seleccionado.
 * **Exportación a PDF**: El generador de informes en PDF declara automáticamente el rango de fechas seleccionado en el encabezado del documento impreso.
+* **Ventana de Turnos Programados (Grilla Detallada)**: Al hacer clic en el botón flotante verde **`📋 Ver Turnos Programados`** en el encabezado, se abre una ventana modal interactiva para consultar la lista pormenorizada de turnos de la fecha seleccionada. Cuenta con buscador en tiempo real por **Apellido y nombres** de pacientes, selectores rápidos de fecha y médico, un checkbox para filtrar solo turnos confirmados por WhatsApp y un diseño estético idéntico a la turnera nativa (mostrando Hora con íconos informativos/WhatsApp, Paciente, Médico, Cobertura, Asistencia, Atención e Historia Clínica).
 
 ### 5.2. Reportes con Gráficos Nativos Premium
 * **Gráfico de Embudo (Funnel) de Obras Sociales**: Muestra el Top 5 de atenciones confirmadas por cobertura, ordenadas jerárquicamente con barras horizontales de ancho proporcional y degradados, acompañadas de tooltips.
