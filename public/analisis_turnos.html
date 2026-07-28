@@ -1215,7 +1215,9 @@
                     method: 'GET',
                     headers: {
                         'apikey': supabaseAnonKey,
-                        'Authorization': `Bearer ${supabaseAnonKey}`
+                        'Authorization': `Bearer ${supabaseAnonKey}`,
+                        'Accept-Profile': 'control_de_horas',
+                        'Content-Profile': 'control_de_horas'
                     }
                 });
 
