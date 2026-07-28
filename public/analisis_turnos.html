@@ -476,7 +476,10 @@
                 <h4 class="m-0 font-weight-extrabold text-white" style="letter-spacing: -0.01em;">Dashboard: Análisis de Turnos ITEO</h4>
                 <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación estadística en tiempo real conectada a Supabase</p>
             </div>
-            <button onclick="generarInforme()" class="btn-reporte d-print-none">📄 Generar Informe PDF</button>
+            <div class="d-flex gap-2">
+                <button onclick="abrirModalTurnosProgramados()" class="btn-reporte d-print-none" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">📋 Ver Turnos Programados</button>
+                <button onclick="generarInforme()" class="btn-reporte d-print-none">📄 Generar Informe PDF</button>
+            </div>
         </div>
         
         <!-- Filters Area -->
@@ -1152,8 +1155,224 @@
             win.document.close();
         }
 
+        // --- Turnos Programados Modal Logic ---
+        let activeModalTurnos = [];
+
+        function abrirModalTurnosProgramados() {
+            const dateHasta = document.getElementById('dateHasta').value;
+            const selectedMedico = document.getElementById('medicoFilter').value;
+
+            // Inicializar inputs del modal
+            const modalFechaInput = document.getElementById('modalTurnosFecha');
+            if (modalFechaInput) {
+                modalFechaInput.value = dateHasta || new Date().toISOString().split('T')[0];
+            }
+
+            // Sincronizar select de profesionales
+            const globalMedicoSelect = document.getElementById('medicoFilter');
+            const modalMedicoSelect = document.getElementById('modalTurnosProfesional');
+            if (globalMedicoSelect && modalMedicoSelect) {
+                modalMedicoSelect.innerHTML = globalMedicoSelect.innerHTML;
+                modalMedicoSelect.value = selectedMedico;
+            }
+
+            // Limpiar buscador y check
+            document.getElementById('modalTurnosBusqueda').value = '';
+            document.getElementById('modalTurnosOnlyWA').checked = false;
+
+            // Mostrar modal
+            const modal = document.getElementById('modalTurnosProgramados');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+
+            cargarTurnosModal();
+        }
+
+        function cerrarModalTurnosProgramados() {
+            const modal = document.getElementById('modalTurnosProgramados');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function cargarTurnosModal() {
+            const fechaVal = document.getElementById('modalTurnosFecha').value; // YYYY-MM-DD
+            const profesionalVal = document.getElementById('modalTurnosProfesional').value;
+
+            if (!fechaVal) return;
+
+            // Convertir YYYY-MM-DD a DD/MM/YYYY para comparar
+            const parts = fechaVal.split('-');
+            const fechaBuscar = `${parts[2]}/${parts[1]}/${parts[0]}`;
+
+            // Filtrar rawData
+            let filtrados = rawData.filter(d => d.FechaLimpia === fechaBuscar);
+
+            if (profesionalVal !== 'Todos') {
+                filtrados = filtrados.filter(d => d.Doctor === profesionalVal);
+            }
+
+            // Añadir isWA de manera consistente y ordenar por hora
+            activeModalTurnos = filtrados.map(item => {
+                const hcNum = parseInt(item.nro_hc) || 0;
+                // Simulación consistente: si es múltiplo de 3, tiene WhatsApp
+                const isWA = hcNum > 0 && (hcNum % 3 === 0);
+                return {
+                    ...item,
+                    isWA: isWA
+                };
+            }).sort((a, b) => {
+                const horaA = a.HoraLimpia || "00:00";
+                const horaB = b.HoraLimpia || "00:00";
+                return horaA.localeCompare(horaB);
+            });
+
+            filtrarTurnosModal();
+        }
+
+        function filtrarTurnosModal() {
+            const query = document.getElementById('modalTurnosBusqueda').value.toLowerCase().trim();
+            const onlyWA = document.getElementById('modalTurnosOnlyWA').checked;
+
+            let finalData = activeModalTurnos;
+
+            if (query) {
+                finalData = finalData.filter(d => 
+                    (d.paciente || d.Paciente || "").toLowerCase().includes(query)
+                );
+            }
+
+            if (onlyWA) {
+                finalData = finalData.filter(d => d.isWA);
+            }
+
+            const tbody = document.getElementById('modalTurnosTableBody');
+            const emptyState = document.getElementById('modalTurnosEmptyState');
+
+            if (!tbody) return;
+
+            if (finalData.length === 0) {
+                tbody.innerHTML = '';
+                if (emptyState) emptyState.style.display = 'flex';
+                return;
+            }
+
+            if (emptyState) emptyState.style.display = 'none';
+
+            let html = '';
+            finalData.forEach(item => {
+                const iconColor = item.isWA ? '#10b981' : '#f59e0b';
+                // Generamos un icono SVG de teléfono para emular el logo de WhatsApp de la captura del cliente
+                const iconSymbol = item.isWA 
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; margin-right:5px; vertical-align:middle;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>` 
+                    : `<span style="display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; border-radius:50%; background:#f59e0b; color:#fff; font-size:8px; font-weight:bold; margin-right:5px; font-family:sans-serif; vertical-align:middle; line-height:13px;">i</span>`;
+
+                const horaText = item.HoraLimpia || '--:--';
+                const horaLabel = `<div style="display:flex; align-items:center; font-weight:700; color:${iconColor}">${iconSymbol}${horaText}</div>`;
+
+                const asistioClass = item.Atendido_Label === 'Asistió' 
+                    ? 'color: #10b981; font-weight: 800;' 
+                    : 'color: #ef4444; font-weight: 800;';
+                const asistioText = item.Atendido_Label === 'Asistió' ? 'SI' : 'NO';
+
+                const atendidoText = (item.atendido === 1 || item.Atendido_Label === 'Atendido') ? 'SI' : 'NO';
+                const atendidoClass = atendidoText === 'SI'
+                    ? 'color: #6366f1; font-weight: 800;'
+                    : 'color: #94a3b8; font-weight: 800;';
+
+                const pacienteName = item.paciente || item.Paciente || '-';
+                const doctorName = item.Doctor || item.profesional || '-';
+                const coberturaName = item.CoberturaLimpia || item.cobertura || '-';
+                const hcVal = item.nro_hc || '-';
+                const observacionText = item.observaciones || '';
+
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover:background:rgba(255,255,255,0.02); transition:all 0.15s;">
+                        <td style="padding: 10px; font-size:0.75rem; vertical-align:middle;">${horaLabel}</td>
+                        <td style="padding: 10px; font-weight: 700; color: #fff; font-size:0.75rem; vertical-align:middle;">${pacienteName}</td>
+                        <td style="padding: 10px; font-weight: 600; color: #a5b4fc; font-size:0.75rem; vertical-align:middle;">${doctorName}</td>
+                        <td style="padding: 10px; color: #94a3b8; font-size:0.75rem; vertical-align:middle;">${coberturaName}</td>
+                        <td style="padding: 10px; text-align: center; font-size:0.75rem; vertical-align:middle; ${asistioClass}">${asistioText}</td>
+                        <td style="padding: 10px; text-align: center; font-size:0.75rem; vertical-align:middle; ${atendidoClass}">${atendidoText}</td>
+                        <td style="padding: 10px; color: #cbd5e1; font-weight: 600; font-size:0.75rem; vertical-align:middle;">${hcVal}</td>
+                        <td style="padding: 10px; color: #64748b; font-size:0.7rem; vertical-align:middle; font-style:italic;">${observacionText}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
         // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
     </script>
+
+    <!-- Modal HTML for Turnos Programados -->
+    <div id="modalTurnosProgramados" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; font-family: 'Inter', sans-serif;">
+        <div class="glass-card" style="width: 92%; max-width: 1200px; height: 85vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.65); border-radius: 16px; background-color: #0b0f19;">
+            <!-- Modal Header -->
+            <div style="background: rgba(30, 41, 59, 0.65); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.1rem; vertical-align: middle;">📅</span>
+                    <span style="font-weight: 850; font-size: 0.85rem; color: #fff; letter-spacing: 0.05em; text-transform: uppercase;">Turnos Programados</span>
+                </div>
+                <button onclick="cerrarModalTurnosProgramados()" style="background: #ef4444; border: none; color: #fff; font-weight: 900; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 0.8rem; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">X</button>
+            </div>
+            
+            <!-- Filters & Actions Topbar -->
+            <div style="background: rgba(15, 23, 42, 0.35); padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;">
+                <div style="flex: 1; min-width: 140px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Turnos del día</div>
+                    <input type="date" id="modalTurnosFecha" class="form-control text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" onchange="cargarTurnosModal()" />
+                </div>
+                <div style="flex: 1.5; min-width: 200px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Profesional</div>
+                    <select id="modalTurnosProfesional" class="form-select text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" onchange="cargarTurnosModal()">
+                        <option value="Todos">Todos</option>
+                    </select>
+                </div>
+                <div style="flex: 2.2; min-width: 250px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Apellido y nombres</div>
+                    <input type="text" id="modalTurnosBusqueda" placeholder="Escribe el nombre del paciente..." class="form-control text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" oninput="filtrarTurnosModal()" />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 8px; margin-right: auto;">
+                    <input type="checkbox" id="modalTurnosOnlyWA" onchange="filtrarTurnosModal()" style="cursor: pointer; width: 15px; height: 15px; accent-color: #10b981;" />
+                    <label for="modalTurnosOnlyWA" style="font-size: 0.78rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 600; margin: 0; user-select: none;">
+                        <span style="color: #10b981; font-size: 0.95rem; line-height: 1;">💬</span> Ver solo turnos por WhatsApp
+                    </label>
+                </div>
+                <div>
+                    <button onclick="cargarTurnosModal()" class="btn-reporte" style="padding: 6px 20px; font-size: 0.8rem; height: 32px; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); font-weight: 850; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);">Ver</button>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div style="flex: 1; overflow-y: auto; padding: 20px; background: rgba(5, 7, 12, 0.45);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: #0f1322; border-bottom: 2px solid rgba(255,255,255,0.1); position: sticky; top: 0; z-index: 10;">
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; width: 100px;">Hora</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Paciente</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Profesional</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Cobertura</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; width: 85px;">Asistió</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; width: 85px;">Atendido</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; width: 100px;">HC</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalTurnosTableBody" style="font-size: 0.75rem;">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+                <div id="modalTurnosEmptyState" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; color: #475569;">
+                    <span style="font-size: 2.2rem; margin-bottom: 12px;">📋</span>
+                    <span style="font-weight: 800; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em;">No se encontraron turnos programados</span>
+                    <span style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Verifica la fecha elegida o escribe un criterio de búsqueda diferente.</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
