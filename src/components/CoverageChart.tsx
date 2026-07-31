@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Area, Shift, Person, DemandRecord } from '../types';
 import { formatHour, getHourRange, calculateCoverage } from '../utils';
+import { supabaseControl } from '../supabase';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -101,6 +102,72 @@ export function CoverageChart({
   activeDate,
 }: CoverageChartProps) {
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [hourlyPatientsStats, setHourlyPatientsStats] = useState<{
+    art: number[];
+    os: number[];
+    particular: number[];
+  }>({
+    art: Array(24).fill(0),
+    os: Array(24).fill(0),
+    particular: Array(24).fill(0)
+  });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchStats() {
+      if (!activeDate) return;
+      setLoadingStats(true);
+      try {
+        const { data, error } = await supabaseControl
+          .from('planning_patient_appointments')
+          .select('turno, clase')
+          .gte('turno', `${activeDate}T00:00:00`)
+          .lte('turno', `${activeDate}T23:59:59`);
+
+        if (error) throw error;
+
+        const artArr = Array(24).fill(0);
+        const osArr = Array(24).fill(0);
+        const partArr = Array(24).fill(0);
+
+        if (data) {
+          data.forEach((item: any) => {
+            if (!item.turno) return;
+            const hourPart = item.turno.split('T')[1];
+            if (!hourPart) return;
+            const hour = parseInt(hourPart.split(':')[0], 10);
+            if (isNaN(hour) || hour < 0 || hour >= 24) return;
+
+            const rawClase = (item.clase || '').toUpperCase();
+            if (rawClase.includes('ART')) {
+              artArr[hour]++;
+            } else if (rawClase.includes('OBRA') || rawClase.includes('OS') || rawClase.includes('SOCIAL')) {
+              osArr[hour]++;
+            } else {
+              partArr[hour]++;
+            }
+          });
+        }
+
+        if (isMounted) {
+          setHourlyPatientsStats({ art: artArr, os: osArr, particular: partArr });
+        }
+      } catch (err) {
+        console.error("Error fetching hourly patients stats for coverage:", err);
+      } finally {
+        if (isMounted) {
+          setLoadingStats(false);
+        }
+      }
+    }
+
+    fetchStats();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDate]);
+
   const [isQuickLoaderOpen, setIsQuickLoaderOpen] = useState(false);
   const [quickLoaderTab, setQuickLoaderTab] = useState<'paste' | 'excel'>('paste');
   const [pasteText, setPasteText] = useState('');
@@ -971,6 +1038,63 @@ export function CoverageChart({
                 return (
                   <div key={hour} className={`font-mono font-bold select-none ${isUnder ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
                     {actual}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fila 2.1: Turnos Pacientes ART */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-rose-455 text-rose-405 text-rose-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <span>Turnos Pacientes ART:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.art[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fila 2.2: Turnos Pacientes OS */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-indigo-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <span>Turnos Pacientes OS:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.os[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-indigo-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fila 2.3: Turnos Pacientes Particular */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span>Turnos Pacientes Particular:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.particular[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
                   </div>
                 );
               })}
