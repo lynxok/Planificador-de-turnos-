@@ -50,7 +50,8 @@ import {
   CalendarDays,
   BarChart3,
   Users,
-  History
+  History,
+  Copy
 } from 'lucide-react';
 
 import { SyncLogsModal } from './components/SyncLogsModal';
@@ -363,6 +364,65 @@ export default function App() {
       alert(`¡Carga Exitosa! Se cargaron los turnos principales para ${loadedCount} personas en el día ${activeDate}. Recuerda guardar los cambios.`);
     } else {
       alert("No se cargaron nuevos turnos. Todos los integrantes activos del área ya tienen turnos asignados (o ausencias registradas) para hoy.");
+    }
+  };
+
+  const handleReplicateWeek = () => {
+    // 1. Obtener las fechas de lunes a domingo de la semana actual
+    const currentWeekDates = getWeekDates(activeDate);
+    const workDays = currentWeekDates.slice(0, 5); // Lunes a Viernes
+
+    // 2. Calcular los días correspondientes de la semana siguiente (sumando 7 días)
+    const nextWeekDates = workDays.map(dateStr => {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    });
+
+    // 3. Filtrar todos los turnos asignados de Lunes a Viernes en la semana actual para el área activa
+    const currentWeekShifts = shifts.filter(s => 
+      workDays.includes(s.date) && (activeArea === 'Todos' || s.area === activeArea)
+    );
+
+    if (currentWeekShifts.length === 0) {
+      alert("No se encontraron turnos de Lunes a Viernes cargados en la semana actual para copiar.");
+      return;
+    }
+
+    const newShifts = [...shifts];
+    let copiedCount = 0;
+
+    // 4. Mapear cada turno a la fecha equivalente de la semana siguiente
+    currentWeekShifts.forEach(s => {
+      const dayIdx = workDays.indexOf(s.date);
+      const targetDate = nextWeekDates[dayIdx];
+
+      // Evitar duplicaciones: verificar si esta persona ya tiene un turno ese día
+      const alreadyHasShift = newShifts.some(ns => ns.personId === s.personId && ns.date === targetDate);
+      if (alreadyHasShift) return;
+
+      const newShiftId = 's_rep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      newShifts.push({
+        id: newShiftId,
+        personId: s.personId,
+        date: targetDate,
+        startHour: s.startHour,
+        duration: s.duration,
+        area: s.area
+      });
+      copiedCount++;
+    });
+
+    if (copiedCount > 0) {
+      setShifts(newShifts);
+      saveToLocalStorage(persons, newShifts, targets);
+      setHasUnsavedChanges(true);
+      alert(`¡Replicación Exitosa! Se copiaron ${copiedCount} turnos de Lunes a Viernes a la semana siguiente (desde el Lunes ${nextWeekDates[0]} al Viernes ${nextWeekDates[4]}). Las guardias de fin de semana no fueron alteradas. Recuerda guardar los cambios.`);
+    } else {
+      alert("No se copiaron turnos nuevos. Todos los colaboradores ya tienen turnos programados en los días equivalentes de la semana siguiente.");
     }
   };
 
@@ -1314,6 +1374,15 @@ export default function App() {
               >
                 <Sparkles size={13} className="text-indigo-150 animate-pulse" />
                 <span>Cargar Principales</span>
+              </button>
+
+              <button
+                onClick={handleReplicateWeek}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-indigo-500/30"
+                title="Copia los turnos de Lunes a Viernes de la semana actual a la semana siguiente (las guardias de fin de semana se cargan aparte)"
+              >
+                <Copy size={13} className="text-indigo-100" />
+                <span>Replicar Semana (Lun-Vie)</span>
               </button>
 
               <input
