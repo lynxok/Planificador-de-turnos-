@@ -86,7 +86,15 @@ Al presionar el botón **"Actualizador de turnos"** en la interfaz:
 * **Ubicación**: En el encabezado superior derecho, dentro del menú de **`🛠️ Herramientas`**.
 * **Proceso**: Escanea a todos los colaboradores del departamento activo en el día seleccionado. Si no cuentan con turnos asignados ni ausencias programadas, les genera de forma automática un turno de trabajo real aplicando el horario que el usuario haya tildado como **⭐️ Principal** en su ficha.
 
-### 4.3. Registro de Ausencias (Vacaciones y Enfermedad)
+### 4.3. Botón "Replicar Semana (Lun-Vie)" (Clonación Inteligente de Horarios Fijos)
+* **Ubicación**: En el encabezado superior derecho, dentro del menú de **`🛠️ Herramientas`**.
+* **Proceso**: Lee todos los turnos asignados para el área activa de **Lunes a Viernes** de la semana actual y los clona automáticamente en los días correspondientes de la semana siguiente (sumándoles 7 días a cada fecha).
+* **Seguridad**:
+  * Comprueba si el colaborador ya cuenta con un turno en la nueva fecha de la semana siguiente, previniendo duplicaciones.
+  * **Excluye Sábados y Domingos**: Por diseño, las guardias de fines de semana no se replican (puesto que se administran de manera rotativa o manual por el usuario).
+* **Confirmación**: Solicita confirmación y muestra una alerta con el recuento exacto de turnos copiados. Recuerda presionar **`Guardar Cambios`** para consolidarlos en Supabase.
+
+### 4.4. Registro de Ausencias (Vacaciones y Enfermedad)
 * **Atajos Rápidos**: Al programar un turno en el modal de edición, cuentas con los botones **`🏝️ Vacaciones`** y **`🤒 Enfermedad`**.
 * **Configuración Automática**: Al hacer clic en uno de ellos, el sistema configura el turno para que dure 24 horas y le asigna el área especial correspondiente.
 * **Aspecto Visual en Turnera**: Se dibujan bloques completos con rayas diagonales degradadas:
