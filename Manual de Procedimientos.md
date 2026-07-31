@@ -103,6 +103,14 @@ Se añadieron los siguientes temas premium solicitados por el usuario:
 
 ### 4.5. Scroll Único de Página Completa
 * La cuadrícula de turnos se dibuja en su totalidad de arriba a abajo.
+
+### 4.6. Desglose de Turnos de Pacientes por Clase en el Planificador de Personal
+* **Ubicación**: En la parte inferior del **`Monitor de Cobertura y Densidad de Personal`** (debajo del gráfico de barras horarias).
+* **Métricas en Tiempo Real**: Muestra el recuento de citas de pacientes agendadas por hora en Supabase, divididas en las tres categorías fundamentales de la clínica:
+  * **Turnos Pacientes ART**: En color rojo.
+  * **Turnos Pacientes OS** (Obra Social): En color índigo.
+  * **Turnos Pacientes Particular**: En color amarillo.
+* **Integración**: Permite a los planificadores de personal correlacionar de forma visual e inmediata la afluencia de pacientes por tipo contra la cantidad de personal en su puesto de trabajo a esa misma hora para optimizar la dotación del personal y evitar cuellos de botella en la atención.
 * No existen barras de desplazamiento vertical internas dentro de la grilla. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
 * El **Monitor de Cobertura y Densidad** se ubica al pie de la página, accesible deslizando la página web hacia abajo.
 
