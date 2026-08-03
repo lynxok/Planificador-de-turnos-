@@ -796,15 +796,16 @@ export function CoverageChart({
       </div>
 
       {/* Segment 3: GRÁFICO DE COBERTURA Y ANÁLISIS DE TURNOS POR HORA HOY */}
-      <div className="space-y-4 relative z-10">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-extrabold tracking-wider uppercase text-[#d4af37]">
-            Gráfico de Cobertura por Hora y Flujo de Turnos (Entradas / Salidas)
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-            <HelpCircle size={11} /> Pasa el cursor sobre las columnas para ver los nombres y detalles de ingresos.
-          </span>
-        </div>
+      <div className="space-y-4 relative z-10 w-full overflow-x-auto custom-scrollbar">
+        <div className="min-w-[920px] space-y-4">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-extrabold tracking-wider uppercase text-[#d4af37]">
+              Gráfico de Cobertura por Hora y Flujo de Turnos (Entradas / Salidas)
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+              <HelpCircle size={11} /> Pasa el cursor sobre las columnas para ver los nombres y detalles de ingresos.
+            </span>
+          </div>
 
         <div className="relative">
           {/* Líneas de guía de fondo */}
@@ -815,7 +816,7 @@ export function CoverageChart({
           </div>
 
           {/* Columnas del gráfico */}
-          <div className="grid grid-cols-24 gap-1.5 pt-4 pb-2 items-end min-h-[170px] px-1 relative z-15 overflow-x-auto overflow-y-hidden select-none custom-scrollbar">
+          <div className="grid grid-cols-24 gap-1.5 pt-4 pb-2 items-end min-h-[170px] px-1 relative z-15 select-none">
             {hourRange.map((hour, idx) => {
               const actual = actualCoverage[idx];
               const target = effectiveTargetCount[idx];
@@ -1141,6 +1142,7 @@ export function CoverageChart({
             </div>
           </div>
 
+          </div>
         </div>
       </div>
     </div>
