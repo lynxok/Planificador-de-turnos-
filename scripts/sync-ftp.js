@@ -44,7 +44,10 @@ function parseExcelDateTimeForUpsert(serial) {
   const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(dateObj.getUTCDate()).padStart(2, '0');
   
-  return `${yyyy}-${mm}-${dd} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return {
+    timestamp: `${yyyy}-${mm}-${dd} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+    hour: hours
+  };
 }
 
 async function runSync() {
@@ -58,6 +61,17 @@ async function runSync() {
     console.log("Downloading Turnos.xlsx...");
     await client.downloadTo(localExcelPath, "Turnos.xlsx");
     
+    // Fetch rehabilitation professionals to filter out bug appointments
+    console.log("Fetching rehabilitation professionals list for filtering...");
+    const { data: rehabProfs, error: rehabErr } = await supabase
+      .from('turnera_profesionales')
+      .select('profesional')
+      .eq('tipo_consulta', 'REHABILITACION');
+    
+    if (rehabErr) throw rehabErr;
+    const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
+    console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
+
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
@@ -72,7 +86,16 @@ async function runSync() {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
         
-        const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
+        const parseResult = parseExcelDateTimeForUpsert(serial);
+        const hour = parseResult.hour;
+        const turnoTimestamp = parseResult.timestamp;
+        
+        const profName = r["Profesional"] ? String(r["Profesional"]).trim().toUpperCase() : "";
+        if ((hour < 7 || hour > 21) && rehabProfsSet.has(profName)) {
+          // Skip buggy/administrative rehabilitation appointments outside work hours (e.g. 22hs, 23hs, 00hs)
+          return;
+        }
+        
         const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;
         
         if (!uniqueMap.has(key)) {

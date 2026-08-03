@@ -159,13 +159,13 @@ async function syncFromFtpInternal() {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
 
-        // Check for rehabilitation appointments bug (22hs and 23hs)
+        // Check for rehabilitation appointments bug (administrative rows outside work hours, e.g. 22hs, 23hs, 00hs)
         const fractional_day = serial - Math.floor(serial);
         const total_seconds = Math.round(fractional_day * 24 * 60 * 60);
         const hours = Math.floor(total_seconds / 3600);
 
         const profName = r["Profesional"] ? String(r["Profesional"]).trim().toUpperCase() : "";
-        if ((hours === 22 || hours === 23) && rehabProfsSet.has(profName)) {
+        if ((hours < 7 || hours > 21) && rehabProfsSet.has(profName)) {
           // Skip this bug row
           return;
         }
