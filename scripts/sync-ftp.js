@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +28,9 @@ const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 
 function parseExcelDateTimeForUpsert(serial) {
   const utc_days = Math.floor(serial - 25569);
@@ -124,6 +127,7 @@ async function runSync() {
         
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, {
+            id: crypto.randomUUID(),
             paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
             profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
             cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
@@ -142,7 +146,8 @@ async function runSync() {
       for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
         const batch = mappedRows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
-          .rpc('upsert_patient_appointments', { payload: batch });
+          .from('planning_patient_appointments')
+          .upsert(batch, { onConflict: 'paciente,profesional,turno' });
         if (error) {
           console.error(`Error uploading batch at index ${i}:`, error.message);
           throw error;

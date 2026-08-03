@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -199,6 +200,7 @@ async function syncFromFtpInternal() {
         
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, {
+            id: crypto.randomUUID(),
             paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
             profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
             cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
