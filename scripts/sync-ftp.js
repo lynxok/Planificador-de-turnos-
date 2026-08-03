@@ -72,6 +72,30 @@ async function runSync() {
     const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
     console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
 
+    const rehabProfsList = (rehabProfs || []).map(p => String(p.profesional).trim());
+    if (rehabProfsList.length > 0) {
+      const today = new Date();
+      const startRange = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const startRangeStr = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
+      
+      const endRange = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      const endRangeStr = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}T23:59:59`;
+      
+      console.log(`Purging existing rehabilitation appointments in Supabase from ${startRangeStr} to ${endRangeStr} to remove canceled/ghost sessions...`);
+      const { error: purgeErr } = await supabase
+        .from('planning_patient_appointments')
+        .delete()
+        .in('profesional', rehabProfsList)
+        .gte('turno', startRangeStr)
+        .lte('turno', endRangeStr);
+        
+      if (purgeErr) {
+        console.error("Warning: could not purge old rehab appointments:", purgeErr.message);
+      } else {
+        console.log("✓ Purged old rehab appointments successfully.");
+      }
+    }
+
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
