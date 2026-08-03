@@ -120,7 +120,7 @@ Se añadieron los siguientes temas premium solicitados por el usuario:
   * **Turnos Pacientes Particular**: En color amarillo.
 * **Integración**: Permite a los planificadores de personal correlacionar de forma visual e inmediata la afluencia de pacientes por tipo contra la cantidad de personal en su puesto de trabajo a esa misma hora para optimizar la dotación del personal y evitar cuellos de botella en la atención.
 * No existen barras de desplazamiento vertical internas dentro de la grilla. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
-* El **Monitor de Cobertura y Densidad** se ubica al pie de la página, accesible deslizando la página web hacia abajo.
+* **Compatibilidad Responsive**: El layout principal limita la columna derecha mediante `min-w-0` y el **Monitor de Cobertura y Densidad** (al pie de la página, accesible deslizando la página web hacia abajo) envuelve los gráficos y tablas en un contenedor con scroll horizontal unificado (`overflow-x-auto min-w-[920px]`). Esto asegura una visualización perfecta en cualquier resolución de pantalla o notebook (como pantallas de 13 pulgadas o tablets) sin cortar el diseño ni desbordar la ventana principal del navegador.
 
 ---
 
