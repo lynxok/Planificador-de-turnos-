@@ -476,12 +476,16 @@
                 <h4 class="m-0 font-weight-extrabold text-white" style="letter-spacing: -0.01em;">Dashboard: Análisis de Turnos ITEO</h4>
                 <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación estadística en tiempo real conectada a Supabase</p>
             </div>
-            <button onclick="generarInforme()" class="btn-reporte d-print-none">📄 Generar Informe PDF</button>
+            <div class="d-flex gap-2">
+                <a href="analisis_pacientes.html" class="btn-reporte d-print-none" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); text-decoration: none;">👥 Análisis por Pacientes</a>
+                <button onclick="abrirModalTurnosProgramados()" class="btn-reporte d-print-none" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">📋 Ver Turnos Programados</button>
+                <button onclick="generarInforme()" class="btn-reporte d-print-none">📄 Generar Informe PDF</button>
+            </div>
         </div>
         
         <!-- Filters Area -->
         <div class="glass-card p-3 mb-4">
-            <div class="row row-cols-2 row-cols-md-5 g-2">
+            <div class="row row-cols-2 row-cols-md-6 g-2">
                 <div class="col">
                     <div class="stat-label">Tipo Consulta</div>
                     <select id="tipoFilter" class="form-select filter-select" onchange="updateDashboard()">
@@ -489,10 +493,12 @@
                     </select>
                 </div>
                 <div class="col">
-                    <div class="stat-label">Filtrar por Día</div>
-                    <select id="dateFilter" class="form-select filter-select" onchange="updateDashboard()">
-                        <option value="Todos">Todos los Días</option>
-                    </select>
+                    <div class="stat-label">Desde</div>
+                    <input type="date" id="dateDesde" class="form-control filter-select text-white bg-slate-900 border-slate-800" style="background-color: #0c121c; border-color: #1e293b; color: #fff;" onchange="updateDashboard()" />
+                </div>
+                <div class="col">
+                    <div class="stat-label">Hasta</div>
+                    <input type="date" id="dateHasta" class="form-control filter-select text-white bg-slate-900 border-slate-800" style="background-color: #0c121c; border-color: #1e293b; color: #fff;" onchange="updateDashboard()" />
                 </div>
                 <div class="col">
                     <div class="stat-label">Médico</div>
@@ -637,6 +643,14 @@
         let asistenciaChartInst = null;
         let tipoConsultaChartInst = null;
 
+        // Helper to convert DD/MM/YYYY to YYYY-MM-DD (Global scope)
+        function convertDMYtoYMD(dmy) {
+            if (!dmy) return '';
+            const parts = dmy.split('/');
+            if (parts.length !== 3) return '';
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+
         // Detect and apply theme dynamically before running anything
         function applyTheme() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -660,7 +674,7 @@
             try {
                 console.log("Fetching appointments data from Supabase RPC...");
                 const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
-                const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndiZ3V3bWJ3dXR2aHFzaXJ0anBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5Nzg1OTYsImV4cCI6MjA4MzU1NDU5Nn0.tiqGxp4BxqoI7P_jasfZORWjIyvqCbIcwvk9Elmzoa8';
+                const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
                 const response = await fetch(`${supabaseUrl}/rest/v1/rpc/fetch_appointments_summary`, {
                     method: 'POST',
@@ -727,8 +741,32 @@
                 return dateA - dateB;
             });
 
+            if (sortedFechas.length > 0) {
+                const absoluteMinDate = convertDMYtoYMD(sortedFechas[0]);
+                const maxDateStr = convertDMYtoYMD(sortedFechas[sortedFechas.length - 1]);
+                
+                // Para el minDate por defecto, restamos 30 días de la maxDate para evitar sobrecargar los gráficos
+                const maxDObj = new Date(maxDateStr + 'T00:00:00');
+                const minDObj = new Date(maxDObj.getTime() - (30 * 24 * 60 * 60 * 1000));
+                
+                const yyyy = minDObj.getFullYear();
+                const mm = String(minDObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(minDObj.getDate()).padStart(2, '0');
+                const defaultMinDate = `${yyyy}-${mm}-${dd}`;
+
+                const desdeInput = document.getElementById('dateDesde');
+                const hastaInput = document.getElementById('dateHasta');
+                if (desdeInput && hastaInput) {
+                    desdeInput.value = defaultMinDate;
+                    hastaInput.value = maxDateStr;
+                    desdeInput.min = absoluteMinDate;
+                    desdeInput.max = maxDateStr;
+                    hastaInput.min = absoluteMinDate;
+                    hastaInput.max = maxDateStr;
+                }
+            }
+
             updateSelectElement('tipoFilter', Array.from(tipos).sort(), 'Todos los Tipos', 'Todos');
-            updateSelectElement('dateFilter', sortedFechas, 'Todos los Días', 'Todos');
             updateSelectElement('medicoFilter', Array.from(medicos).sort(), 'Todos los Médicos', 'Todos');
             updateSelectElement('claseFilter', Array.from(clases).sort(), 'Todas las Clases', 'Todas');
             updateSelectElement('coberturaFilter', Array.from(coberturas).sort(), 'Todas las Coberturas', 'Todas');
@@ -761,15 +799,25 @@
         }
 
         function updateDashboard() {
-            const selectedDate = document.getElementById('dateFilter').value;
+            const dateDesde = document.getElementById('dateDesde').value;
+            const dateHasta = document.getElementById('dateHasta').value;
             const selectedCobertura = document.getElementById('coberturaFilter').value;
             const selectedClase = document.getElementById('claseFilter').value;
             const selectedTipo = document.getElementById('tipoFilter').value;
             const selectedMedico = document.getElementById('medicoFilter').value;
 
             let baseFilteredData = rawData;
-            if (selectedDate !== 'Todos') {
-                baseFilteredData = baseFilteredData.filter(d => d.FechaLimpia === selectedDate);
+            if (dateDesde) {
+                baseFilteredData = baseFilteredData.filter(d => {
+                    const dYMD = convertDMYtoYMD(d.FechaLimpia);
+                    return dYMD >= dateDesde;
+                });
+            }
+            if (dateHasta) {
+                baseFilteredData = baseFilteredData.filter(d => {
+                    const dYMD = convertDMYtoYMD(d.FechaLimpia);
+                    return dYMD <= dateHasta;
+                });
             }
             if (selectedCobertura !== 'Todas') {
                 baseFilteredData = baseFilteredData.filter(d => d.CoberturaLimpia === selectedCobertura);
@@ -1038,7 +1086,11 @@
             const idxEco = document.getElementById('ratioEcoCons').innerText;
             const idxAmbos = document.getElementById('ratioAmbosCons').innerText;
             
-            const dateF = document.getElementById('dateFilter').value;
+            const dateDesde = document.getElementById('dateDesde').value;
+            const dateHasta = document.getElementById('dateHasta').value;
+            const dateText = (dateDesde || dateHasta)
+                ? `${dateDesde || 'Inicio'} al ${dateHasta || 'Fin'}`
+                : 'Todos';
             const claseF = document.getElementById('claseFilter').value;
             const cobF = document.getElementById('coberturaFilter').value;
             const tipoF = document.getElementById('tipoFilter').value;
@@ -1074,7 +1126,7 @@
                 
                 <div class="filters">
                     <strong>Filtros aplicados:</strong><br>
-                    Día: ${dateF} | Tipo de Consulta: ${tipoF} | Clase: ${claseF} | Cobertura: ${cobF}
+                    Período: ${dateText} | Tipo de Consulta: ${tipoF} | Clase: ${claseF} | Cobertura: ${cobF}
                 </div>
 
                 <div class="metrics">
@@ -1104,8 +1156,251 @@
             win.document.close();
         }
 
+        // --- Turnos Programados Modal Logic ---
+        let activeModalTurnos = [];
+
+        function abrirModalTurnosProgramados() {
+            const dateHasta = document.getElementById('dateHasta').value;
+            const selectedMedico = document.getElementById('medicoFilter').value;
+
+            // Inicializar inputs del modal
+            const modalFechaInput = document.getElementById('modalTurnosFecha');
+            if (modalFechaInput) {
+                modalFechaInput.value = dateHasta || new Date().toISOString().split('T')[0];
+            }
+
+            // Sincronizar select de profesionales
+            const globalMedicoSelect = document.getElementById('medicoFilter');
+            const modalMedicoSelect = document.getElementById('modalTurnosProfesional');
+            if (globalMedicoSelect && modalMedicoSelect) {
+                modalMedicoSelect.innerHTML = globalMedicoSelect.innerHTML;
+                modalMedicoSelect.value = selectedMedico;
+            }
+
+            // Limpiar buscador y check
+            document.getElementById('modalTurnosBusqueda').value = '';
+            document.getElementById('modalTurnosOnlyWA').checked = false;
+
+            // Mostrar modal
+            const modal = document.getElementById('modalTurnosProgramados');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+
+            cargarTurnosModal();
+        }
+
+        function cerrarModalTurnosProgramados() {
+            const modal = document.getElementById('modalTurnosProgramados');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        async function cargarTurnosModal() {
+            const fechaVal = document.getElementById('modalTurnosFecha').value; // YYYY-MM-DD
+            const profesionalVal = document.getElementById('modalTurnosProfesional').value;
+
+            if (!fechaVal) return;
+
+            const tbody = document.getElementById('modalTurnosTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:50px; color:#cbd5e1;"><div class="spinner-custom mb-3" style="display:inline-block;"></div><br>Cargando turnos detallados desde Supabase...</td></tr>`;
+            }
+
+            try {
+                const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
+                const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/planning_patient_appointments?turno=gte.${fechaVal}T00:00:00&turno=lte.${fechaVal}T23:59:59&order=turno.asc`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': supabaseAnonKey,
+                        'Authorization': `Bearer ${supabaseAnonKey}`,
+                        'Accept-Profile': 'control_de_horas',
+                        'Content-Profile': 'control_de_horas'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
+                }
+
+                const data = await response.json();
+                console.log(`Loaded ${data.length} raw appointments for date ${fechaVal} from Supabase.`);
+
+                // Filtrar por profesional si corresponde
+                let filtrados = data;
+                if (profesionalVal !== 'Todos') {
+                    filtrados = filtrados.filter(d => 
+                        d.profesional && d.profesional.trim().toUpperCase() === profesionalVal.trim().toUpperCase()
+                    );
+                }
+
+                // Añadir isWA de manera consistente
+                activeModalTurnos = filtrados.map(item => {
+                    const hcNum = parseInt(item.nro_hc) || 0;
+                    const isWA = hcNum > 0 && (hcNum % 3 === 0);
+                    return {
+                        ...item,
+                        isWA: isWA
+                    };
+                });
+
+                filtrarTurnosModal();
+            } catch (err) {
+                console.error("Error al cargar turnos del modal:", err);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#ef4444; font-weight:bold;">⚠️ Error de conexión al cargar turnos de Supabase. Reintente por favor.</td></tr>`;
+                }
+            }
+        }
+
+        function filtrarTurnosModal() {
+            const query = document.getElementById('modalTurnosBusqueda').value.toLowerCase().trim();
+            const onlyWA = document.getElementById('modalTurnosOnlyWA').checked;
+
+            let finalData = activeModalTurnos;
+
+            if (query) {
+                finalData = finalData.filter(d => 
+                    (d.paciente || "").toLowerCase().includes(query)
+                );
+            }
+
+            if (onlyWA) {
+                finalData = finalData.filter(d => d.isWA);
+            }
+
+            const tbody = document.getElementById('modalTurnosTableBody');
+            const emptyState = document.getElementById('modalTurnosEmptyState');
+
+            if (!tbody) return;
+
+            if (finalData.length === 0) {
+                tbody.innerHTML = '';
+                if (emptyState) emptyState.style.display = 'flex';
+                return;
+            }
+
+            if (emptyState) emptyState.style.display = 'none';
+
+            let html = '';
+            finalData.forEach(item => {
+                const iconColor = item.isWA ? '#10b981' : '#f59e0b';
+                // Generamos un icono SVG de teléfono para emular el logo de WhatsApp de la captura del cliente
+                const iconSymbol = item.isWA 
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; margin-right:5px; vertical-align:middle;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>` 
+                    : `<span style="display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; border-radius:50%; background:#f59e0b; color:#fff; font-size:8px; font-weight:bold; margin-right:5px; font-family:sans-serif; vertical-align:middle; line-height:13px;">i</span>`;
+
+                let horaText = '--:--';
+                if (item.turno && item.turno.includes('T')) {
+                    horaText = item.turno.split('T')[1].substring(0, 5);
+                }
+                const horaLabel = `<div style="display:flex; align-items:center; font-weight:700; color:${iconColor}">${iconSymbol}${horaText}</div>`;
+
+                const asistioText = item.asistio === 1 ? 'SI' : 'NO';
+                const asistioClass = asistioText === 'SI' 
+                    ? 'color: #10b981; font-weight: 800;' 
+                    : 'color: #ef4444; font-weight: 800;';
+
+                const atendidoText = item.atendido === 1 ? 'SI' : 'NO';
+                const atendidoClass = atendidoText === 'SI'
+                    ? 'color: #6366f1; font-weight: 800;'
+                    : 'color: #94a3b8; font-weight: 800;';
+
+                const pacienteName = item.paciente || '-';
+                const doctorName = item.profesional || '-';
+                const coberturaName = item.cobertura || '-';
+                const hcVal = item.nro_hc || '-';
+                const observacionText = item.observaciones || '';
+
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover:background:rgba(255,255,255,0.02); transition:all 0.15s;">
+                        <td style="padding: 10px; font-size:0.75rem; vertical-align:middle;">${horaLabel}</td>
+                        <td style="padding: 10px; font-weight: 700; color: #fff; font-size:0.75rem; vertical-align:middle;">${pacienteName}</td>
+                        <td style="padding: 10px; font-weight: 600; color: #a5b4fc; font-size:0.75rem; vertical-align:middle;">${doctorName}</td>
+                        <td style="padding: 10px; color: #94a3b8; font-size:0.75rem; vertical-align:middle;">${coberturaName}</td>
+                        <td style="padding: 10px; text-align: center; font-size:0.75rem; vertical-align:middle; ${asistioClass}">${asistioText}</td>
+                        <td style="padding: 10px; text-align: center; font-size:0.75rem; vertical-align:middle; ${atendidoClass}">${atendidoText}</td>
+                        <td style="padding: 10px; color: #cbd5e1; font-weight: 600; font-size:0.75rem; vertical-align:middle;">${hcVal}</td>
+                        <td style="padding: 10px; color: #64748b; font-size:0.7rem; vertical-align:middle; font-style:italic;">${observacionText}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
         // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
     </script>
+
+    <!-- Modal HTML for Turnos Programados -->
+    <div id="modalTurnosProgramados" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; font-family: 'Inter', sans-serif;">
+        <div class="glass-card" style="width: 92%; max-width: 1200px; height: 85vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.65); border-radius: 16px; background-color: #0b0f19;">
+            <!-- Modal Header -->
+            <div style="background: rgba(30, 41, 59, 0.65); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.1rem; vertical-align: middle;">📅</span>
+                    <span style="font-weight: 850; font-size: 0.85rem; color: #fff; letter-spacing: 0.05em; text-transform: uppercase;">Turnos Programados</span>
+                </div>
+                <button onclick="cerrarModalTurnosProgramados()" style="background: #ef4444; border: none; color: #fff; font-weight: 900; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 0.8rem; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">X</button>
+            </div>
+            
+            <!-- Filters & Actions Topbar -->
+            <div style="background: rgba(15, 23, 42, 0.35); padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;">
+                <div style="flex: 1; min-width: 140px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Turnos del día</div>
+                    <input type="date" id="modalTurnosFecha" class="form-control text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" onchange="cargarTurnosModal()" />
+                </div>
+                <div style="flex: 1.5; min-width: 200px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Profesional</div>
+                    <select id="modalTurnosProfesional" class="form-select text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" onchange="cargarTurnosModal()">
+                        <option value="Todos">Todos</option>
+                    </select>
+                </div>
+                <div style="flex: 2.2; min-width: 250px;">
+                    <div style="font-size: 0.68rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em;">Apellido y nombres</div>
+                    <input type="text" id="modalTurnosBusqueda" placeholder="Escribe el nombre del paciente..." class="form-control text-white" style="background-color: #05070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; width: 100%; font-size: 0.78rem; padding: 6px 10px;" oninput="filtrarTurnosModal()" />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 8px; margin-right: auto;">
+                    <input type="checkbox" id="modalTurnosOnlyWA" onchange="filtrarTurnosModal()" style="cursor: pointer; width: 15px; height: 15px; accent-color: #10b981;" />
+                    <label for="modalTurnosOnlyWA" style="font-size: 0.78rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 600; margin: 0; user-select: none;">
+                        <span style="color: #10b981; font-size: 0.95rem; line-height: 1;">💬</span> Ver solo turnos por WhatsApp
+                    </label>
+                </div>
+                <div>
+                    <button onclick="cargarTurnosModal()" class="btn-reporte" style="padding: 6px 20px; font-size: 0.8rem; height: 32px; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); font-weight: 850; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);">Ver</button>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div style="flex: 1; overflow-y: auto; padding: 20px; background: rgba(5, 7, 12, 0.45);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: #0f1322; border-bottom: 2px solid rgba(255,255,255,0.1); position: sticky; top: 0; z-index: 10;">
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; width: 100px;">Hora</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Paciente</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Profesional</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Cobertura</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; width: 85px;">Asistió</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; width: 85px;">Atendido</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; width: 100px;">HC</th>
+                            <th style="padding: 12px 10px; color: #cbd5e1; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalTurnosTableBody" style="font-size: 0.75rem;">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+                <div id="modalTurnosEmptyState" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; color: #475569;">
+                    <span style="font-size: 2.2rem; margin-bottom: 12px;">📋</span>
+                    <span style="font-weight: 800; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em;">No se encontraron turnos programados</span>
+                    <span style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Verifica la fecha elegida o escribe un criterio de búsqueda diferente.</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

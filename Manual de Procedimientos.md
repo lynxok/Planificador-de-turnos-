@@ -1,23 +1,23 @@
 # Manual de Procedimiento: Sistema de Planificación "SFH ITEO" (Supabase & FTPS Synchronizer)
 
-Este manual describe el funcionamiento, la arquitectura y los procedimientos operativos del sistema de planificación **SFH ITEO** tras la migración completa a la base de datos Supabase de **Hermes-Tesoreria-ITEO**, haciendo de Supabase la fuente única de verdad y relegando el FTP únicamente a sincronizaciones bajo demanda.
+Este manual describe el funcionamiento, la arquitectura y los procedimientos operativos del sistema de planificación **SFH ITEO** tras la migración completa a la base de datos Supabase de **Hermes-Tesoreria-ITEO**, haciendo de Supabase la fuente única de verdad, y la incorporación de la sincronización automática directa y el servidor integrado.
 
 ---
 
 ## 1. Descripción General del Sistema
 
-**SFH ITEO** es un planificador interactivo de turnos, simulador de demanda y gestor de personal para admisores de la clínica. 
-Tras la última actualización, el sistema opera bajo una arquitectura centralizada en la nube:
-1. **Fuente Única de Verdad (Supabase)**: Todos los datos, incluidos la planificación, los empleados y los turnos clínicos de pacientes, se almacenan y consultan en **Supabase**. Se ha eliminado el uso de archivos Excel (`Turnos.xlsx`) o conexiones FTP en tiempo real para las operaciones diarias de consulta.
-2. **Sincronización a Demanda (FTPS)**: Mediante un botón dedicado en la interfaz de usuario, el sistema se conecta de manera segura a la turnera por FTPS para descargar, deduplicar e importar nuevos turnos históricos a Supabase de forma incremental.
+**SFH ITEO** es un planificador interactivo de turnos, simulador de demanda y gestor de personal para admisores de la clínica.
+El sistema opera bajo una arquitectura centralizada en la nube:
+1. **Fuente Única de Verdad (Supabase)**: Todos los datos, incluidos la planificación, los empleados, asistencia y turnos clínicos de pacientes, se almacenan y consultan en **Supabase** bajo el esquema dedicado **`control_de_horas`**.
+2. **Sincronización a Demanda (FTPS)**: Mediante el botón de acciones **"Actualizador de turnos"** en la interfaz, el sistema solicita de forma automatizada al servidor que se conecte a la turnera FTPS para descargar, deduplicar e importar nuevos turnos históricos a Supabase de forma incremental.
 
 ---
 
 ## 2. Arquitectura de Almacenamiento y Datos
 
-### 2.1. Base de Datos Supabase (Proyecto: Hermes-Tesoreria-ITEO)
-Toda la base de datos operativa y de demanda del planificador reside en Supabase:
-* **Endpoint API**: `https://fwsnaasfxfzacchsyijx.supabase.co`
+### 2.1. Base de Datos Supabase (Proyecto: `wbguwmbwutvhqsirtjps`)
+Toda la base de datos operativa y de demanda del planificador reside en Supabase en el esquema `control_de_horas`:
+* **Endpoint API**: `https://wbguwmbwutvhqsirtjps.supabase.co`
 * **Tablas Utilizadas**:
   1. **`planning_areas`**: Listado de las áreas de trabajo activas en el planificador (ej. Admisión).
   2. **`planning_employees`**: Registro de colaboradores (legajo, nombre, área, disponibilidad horaria, color de interfaz y turnos posibles).
@@ -28,8 +28,7 @@ Toda la base de datos operativa y de demanda del planificador reside en Supabase
   7. **`turnera_profesionales`**: Tabla de mapeo de profesionales y especialidades, utilizada para clasificar o excluir consultas.
 
 ### 2.2. Filtro de Especialidades (Exclusión de Kinesiología / Rehabilitación)
-Para alinear la demanda del panel de planificación con la aplicación de escritorio local de la clínica (por ejemplo, reportando exactamente **187 turnos el 23 de junio de 2026**), el sistema filtra y excluye las citas pertenecientes a kinesiología/rehabilitación. 
-Los pacientes de estos profesionales no pasan por la mesa de entrada principal. Se excluyen dinámicamente los profesionales que figuren con `tipo_consulta = 'REHABILITACION'` en `turnera_profesionales` (ej. `LIMONGI MERCEDES`, `MENDOZA MARIA VIVIANA` y `BRUNO DELFINA MARIA`).
+Para alinear la demanda del panel de planificación con la aplicación de escritorio local de la clínica (por ejemplo, reportando exactamente **187 turnos el 23 de junio de 2026**), el sistema filtra y excluye las citas pertenecientes a kinesiología/rehabilitación. Se excluyen dinámicamente los profesionales que figuren con `tipo_consulta = 'REHABILITACION'` en `turnera_profesionales` (ej. `LIMONGI MERCEDES`, `MENDOZA MARIA VIVIANA` y `BRUNO DELFINA MARIA`).
 
 ### 2.3. Vista de Base de Datos (`planning_patient_demand_view`)
 Para maximizar el rendimiento, la demanda horaria no se calcula procesando miles de filas en el servidor backend. Se creó una vista agregada en Supabase que realiza la agrupación y filtrado a nivel de motor PostgreSQL:
@@ -53,86 +52,118 @@ GROUP BY 1, 2, 3;
 
 ## 3. Lógica del Servidor y Gestión de Datos
 
-### 3.1. Consulta Instantánea (`GET /api/db`)
-Cuando el planificador se carga o el usuario navega por los días, el frontend realiza una petición `GET /api/db`.
-* El backend sirve **inmediatamente** los datos consolidados desde su caché en memoria (tiempo de respuesta **< 20ms**).
-* De forma asíncrona (en segundo plano), el backend realiza una consulta paginada a Supabase para refrescar la memoria caché con cualquier cambio de último momento, asegurando que la interfaz esté siempre actualizada sin penalizar la velocidad de navegación del usuario.
+### 3.1. Servidor Único Integrado (Express)
+El backend (`backend/server.ts`) está configurado para servir los archivos de distribución compilados del frontend (`dist/`) de forma unificada.
+* **Puerto de Producción**: `3021`
+* **Acceso**: `http://localhost:3021`
+* Al correr en un servidor único, se evitan errores de tipo *Cross-Origin (CORS)* y el sistema se auto-sustenta de forma local o en la nube sin requerir un hosting estático adicional.
 
-### 3.2. Sincronización de Citas bajo Demanda (`POST /api/sync-demand`)
-Al presionar el botón **"Sincronizar Turnos"** en la interfaz:
-1. El backend se conecta vía FTPS segura a la turnera (`turnera-040626z.iteosrl.com.ar`).
-2. Descarga el archivo `Turnos.xlsx`.
-3. Procesa e identifica los registros de citas.
-4. **Deduplicación Estricta**: Genera una clave única basada en `paciente_profesional_turno` y realiza un `upsert` por lotes de 1000 registros en la tabla `planning_patient_appointments` de Supabase.
-5. Invalida y refresca el caché en memoria del backend consultando la vista actualizada.
-6. El frontend actualiza la interfaz tras completar la sincronización.
+### 3.2. Consulta Instantánea con Caché (`GET /api/db`)
+Cuando el planificador se carga o el usuario navega por los días:
+* El backend sirve **inmediatamente** los datos consolidados desde su caché en memoria (tiempo de respuesta **< 20ms**).
+* De forma asíncrona (en segundo plano), el backend realiza una consulta paginada a Supabase para refrescar la memoria caché con cualquier cambio de último momento, asegurando que la interfaz esté siempre actualizada.
+
+### 3.3. Sincronización Automática e Incremental de Citas (`POST /api/sync-demand`)
+Al presionar el botón **"Actualizador de turnos"** en la interfaz:
+1. El frontend realiza un consumo a la API del backend `/api/sync-demand`.
+2. El backend se conecta vía FTPS segura a la turnera (`turnera-040626z.iteosrl.com.ar`).
+3. Descarga el archivo `Turnos.xlsx`.
+4. Procesa e identifica los registros de citas.
+5. **Deduplicación Estricta**: Genera una clave única basada en `paciente_profesional_turno` y realiza un `upsert` por lotes de 1000 registros en la tabla `planning_patient_appointments` de Supabase.
+6. Invalida y refresca el caché en memoria del backend consultando la vista de base de datos actualizada.
+7. El frontend actualiza de inmediato el planificador sin recargar la página.
 
 ---
 
 ## 4. Manual de Operación en la Interfaz (Frontend)
 
-### 4.1. Nueva Barra Lateral Izquierda (Navegación Vertical SaaS)
-* **Menú Colapsable**: El panel izquierdo actúa como la barra central de navegación, permitiendo alternar instantáneamente entre **Vista Diaria**, **Semana Completa**, **Análisis de Turnera** y **Gestión de Personal**.
-* **Contracción / Expansión**: El botón de menú (tres líneas) en la superior del menú contrae la barra lateral a solo iconos (`w-20`) para maximizar el área de trabajo, o la expande a texto completo (`w-64`).
+### 4.1. Botón "Actualizador de turnos" (Sincronización Inteligente)
+* **Ubicación**: En el encabezado superior derecho del planificador, posiciona el cursor sobre **`🛠️ Herramientas`** para desplegar el panel flotante y haz clic en **"Actualizador de turnos"**.
+* **Proceso**: El botón cambiará de estado a **"Actualizando..."** y el ícono comenzará a girar. Durante este tiempo el servidor realiza de forma invisible toda la descarga FTP e importación a Supabase.
+* **Fallback Interactivo**: Si el servidor backend integrado no estuviera encendido, el sistema capturará el error de red y te ofrecerá de forma interactiva la opción de hacer una sincronización manual subiendo directamente un archivo Excel local desde tu computadora.
 
-### 4.2. Ajuste de Temas Estéticos (Popover Flotante)
-* Al pie de la barra lateral izquierda, el botón **"Ajustar Tema"** (ícono de paleta de colores y engranaje) abre una ventana emergente modal con efecto *Glassmorphism*.
-* Permite seleccionar cualquiera de los 8 temas disponibles. Al elegir un tema, los cambios se guardan automáticamente en el almacenamiento local y la ventana emergente se cierra de forma inteligente al hacer clic fuera del panel.
+### 4.2. Botón "Cargar Principales" (Asignación Automática Inteligente)
+* **Ubicación**: En el encabezado superior derecho, dentro del menú de **`🛠️ Herramientas`**.
+* **Proceso**: Escanea a todos los colaboradores del departamento activo en el día seleccionado. Si no cuentan con turnos asignados ni ausencias programadas, les genera de forma automática un turno de trabajo real aplicando el horario que el usuario haya tildado como **⭐️ Principal** en su ficha.
 
-### 4.3. Panel de Colaboradores Ocultable (People Sidebar)
-* En la pantalla de planificación, el panel lateral de recursos se puede ocultar haciendo clic en la solapa del Chevron izquierdo (`‹`) al borde de la lista.
-* Al contraerse, la cuadrícula de planificación se expande al **100% de la pantalla**, brindando un espacio de trabajo amplio.
-* Para restaurar el panel de personal, haz clic en el botón de personas (`Users`) flotante que aparece en el lateral izquierdo.
+### 4.3. Botón "Replicar Semana (Lun-Vie)" (Clonación Inteligente de Horarios Fijos)
+* **Ubicación**: En el encabezado superior derecho, dentro del menú de **`🛠️ Herramientas`**.
+* **Proceso**: Lee todos los turnos asignados para el área activa de **Lunes a Viernes** de la semana actual y los clona automáticamente en los días correspondientes de la semana siguiente (sumándoles 7 días a cada fecha).
+* **Seguridad**:
+  * Comprueba si el colaborador ya cuenta con un turno en la nueva fecha de la semana siguiente, previniendo duplicaciones.
+  * **Excluye Sábados y Domingos**: Por diseño, las guardias de fines de semana no se replican (puesto que se administran de manera rotativa o manual por el usuario).
+* **Confirmación**: Solicita confirmación y muestra una alerta con el recuento exacto de turnos copiados. Recuerda presionar **`Guardar Cambios`** para consolidarlos en Supabase.
 
-### 4.4. Visualización Completa sin Desplazamientos Internos (Scroll Único)
-* El planificador se dibuja de forma completa y continua de arriba a abajo.
-* No existen barras de desplazamiento vertical internas dentro de la grilla de turnos. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
-* El **Monitor de Cobertura y Densidad** se ubica naturalmente al pie de la página, por lo que para observarlo basta con desplazarse al final de la página web.
+### 4.4. Registro de Ausencias (Vacaciones y Enfermedad)
+* **Atajos Rápidos**: Al programar un turno en el modal de edición, cuentas con los botones **`🏝️ Vacaciones`** y **`🤒 Enfermedad`**.
+* **Configuración Automática**: Al hacer clic en uno de ellos, el sistema configura el turno para que dure 24 horas y le asigna el área especial correspondiente.
+* **Aspecto Visual en Turnera**: Se dibujan bloques completos con rayas diagonales degradadas:
+  * **Vacaciones**: Fondo rayado gris oscuro con etiqueta `🏝️ VACACIONES`.
+  * **Enfermedad**: Fondo rayado rojo con etiqueta `🤒 ENFERMEDAD / LICENCIA`.
+* **Seguridad**: Estos bloques de ausencia están bloqueados para edición rápida (drag/resize) y previenen automáticamente que el botón de carga de principales les asigne turnos de trabajo, asegurando que se respete la licencia del personal.
 
-### 4.5. Sincronización Manual de Turnos
-1. Haz clic en el botón **"Sincronizar Turnos"** (ubicado en el encabezado del planificador).
-2. El botón mostrará un spinner giratorio y cambiará su texto a **"Sincronizando..."**. Durante este proceso, las consultas FTP y la subida en lotes a Supabase se ejecutarán de fondo de forma segura.
-3. Al finalizar, recibirás una alerta de éxito indicando que la base de datos fue actualizada y los nuevos datos se cargarán en pantalla de inmediato.
+### 4.4. Selección de Temas Estéticos
+El sistema cuenta con un catálogo de **11 temas de color estéticos** ajustables desde el menú lateral izquierdo (botón con ícono de paleta ⚙️/🎨).
+Se añadieron los siguientes temas premium solicitados por el usuario:
+* **Vichy**: Un estilo corporativo basado en tonos teal/verde azulado y grises profesionales.
+* **Sorbet**: Una estética otoñal cálida con combinación de verde salvia y rosa viejo/mauve.
+* **Frozen Mist**: Una paleta de alto contraste con acentos naranja vibrantes sobre grises y aceituna oscuro.
 
-### 4.6. Guardado de Planificación
-* Al arrastrar turnos o modificar la cuadrícula, aparecerá el botón **"Guardar Planificación"** en color naranja de manera parpadeante (indicando cambios pendientes).
-* Al hacer clic, se guardarán los turnos y asistencia directamente en Supabase (tarda menos de 50ms). Una vez confirmado, el botón volverá a su estado verde como **"Sincronizado"**.
+### 4.5. Scroll Único de Página Completa
+* La cuadrícula de turnos se dibuja en su totalidad de arriba a abajo.
 
-### 4.7. Botones de Acción Interactivos (Hover Reveal)
-* Para mantener el encabezado limpio y maximizar el área de visualización, la barra de botones del encabezado permanece oculta por defecto.
-* Se muestra únicamente un indicador de estado compacto (`Sincronizado` o `Pendiente Guardar`) y el botón `🛠️ Herramientas`.
-* Al posicionar el cursor sobre ese sector, se desvanece el disparador y se revela instantáneamente un menú flotante con las 8 herramientas de acción. Al mover el cursor fuera del menú, este se repliega de forma limpia.
+### 4.6. Desglose de Turnos de Pacientes por Clase en el Planificador de Personal
+* **Ubicación**: En la parte inferior del **`Monitor de Cobertura y Densidad de Personal`** (debajo del gráfico de barras horarias).
+* **Métricas en Tiempo Real**: Muestra el recuento de citas de pacientes agendadas por hora en Supabase, divididas en las tres categorías fundamentales de la clínica:
+  * **Turnos Pacientes ART**: En color rojo.
+  * **Turnos Pacientes OS** (Obra Social): En color índigo.
+  * **Turnos Pacientes Particular**: En color amarillo.
+* **Integración**: Permite a los planificadores de personal correlacionar de forma visual e inmediata la afluencia de pacientes por tipo contra la cantidad de personal en su puesto de trabajo a esa misma hora para optimizar la dotación del personal y evitar cuellos de botella en la atención.
+* No existen barras de desplazamiento vertical internas dentro de la grilla. Para ver todos los admisores y horarios, se utiliza la barra de scroll general del navegador.
+* **Compatibilidad Responsive**: El layout principal limita la columna derecha mediante `min-w-0` y el **Monitor de Cobertura y Densidad** (al pie de la página, accesible deslizando la página web hacia abajo) envuelve los gráficos y tablas en un contenedor con scroll horizontal unificado (`overflow-x-auto min-w-[920px]`). Esto asegura una visualización perfecta en cualquier resolución de pantalla o notebook (como pantallas de 13 pulgadas o tablets) sin cortar el diseño ni desbordar la ventana principal del navegador.
 
 ---
 
-## 5. Procedimiento de Operación Diario y Mantenimiento
+## 5. Módulo de Reportes, Dashboards y Filtros Avanzados
 
-### 5.1. Arrancar el Planificador
-El sistema incluye scripts automatizados para el inicio y apagado limpio:
-* **Iniciar el Planificador**: Ejecuta el archivo `Iniciar_Planificador_Oculto.vbs` en la raíz. Esto levantará los servidores backend (puerto `3021`) y frontend (puerto `3020`) de forma invisible en segundo plano, y abrirá automáticamente tu navegador predeterminado en `http://localhost:3020`.
+El sistema integra un completo generador de reportes consolidado y dashboards estadísticos dinámicos:
+
+### 5.1. Dashboards de Análisis con Filtro Desde-Hasta
+* **Ubicación**: En la pestaña **`Análisis de Turnera`**.
+* **Filtros Interactivos**: Reemplaza el selector de fecha única por dos campos de fecha interactivos (`Desde` y `Hasta`). Al modificarse, todos los KPI's, gráficos de Chart.js y análisis de frecuencias se recalculan en tiempo real para el rango de fechas seleccionado.
+* **Exportación a PDF**: El generador de informes en PDF declara automáticamente el rango de fechas seleccionado en el encabezado del documento impreso.
+* **Ventana de Turnos Programados (Grilla Detallada)**: Al hacer clic en el botón flotante verde **`📋 Ver Turnos Programados`** en el encabezado, se abre una ventana modal interactiva para consultar la lista pormenorizada de turnos de la fecha seleccionada. Cuenta con buscador en tiempo real por **Apellido y nombres** de pacientes, selectores rápidos de fecha y médico, un checkbox para filtrar solo turnos confirmados por WhatsApp y un diseño estético idéntico a la turnera nativa (mostrando Hora con íconos informativos/WhatsApp, Paciente, Médico, Cobertura, Asistencia, Atención e Historia Clínica).
+
+### 5.2. Reportes con Gráficos Nativos Premium
+* **Gráfico de Embudo (Funnel) de Obras Sociales**: Muestra el Top 5 de atenciones confirmadas por cobertura, ordenadas jerárquicamente con barras horizontales de ancho proporcional y degradados, acompañadas de tooltips.
+* **Histograma de Frecuencia por Día**: Un gráfico cronológico con barras verticales que ilustra el volumen de turnos por fecha. Cuenta con scroll horizontal adaptativo para soportar de forma legible análisis de largos períodos.
+* **Opción "TODOS" (Por Defecto)**: En el selector de profesionales del generador de reportes, la opción **`'TODOS'`** se encuentra seleccionada por defecto al cargar el componente. Esto permite consolidar las estadísticas de la clínica completa e inyectar de inmediato una columna dinámica **"Profesional"** en la grilla de datos, eliminando la necesidad de seleccionar médicos manualmente para obtener un panorama global.
+
+---
+
+## 6. Procedimiento de Operación Diario y Mantenimiento
+
+### 6.1. Arrancar el Planificador
+* **Iniciar el Planificador**: Ejecuta el archivo `Iniciar_Planificador_Oculto.vbs` o `Iniciar_Planificador.bat` en la raíz. Esto levantará los servidores backend y abrirá automáticamente tu navegador en `http://localhost:3021` (o en `http://localhost:3020` en modo desarrollo).
 * **Detener el Planificador**: Ejecuta el archivo `Detener_Planificador.bat` en la raíz para cerrar de forma segura todos los procesos colgados de Node.js o Vite y liberar los puertos.
 
-### 5.2. Copias de Seguridad de Versiones (`Versiones anteriores`)
-Antes de cada compilación de distribución (`npm run build`), se debe copiar la carpeta `dist` anterior a la carpeta `Versiones anteriores/` asignándole un nombre de versión claro (ej. `dist_pre_hover_button_reveal`). Esto garantiza la posibilidad de un rollback inmediato en caso de fallos.
+### 6.2. Configuración del Horario Principal de Colaboradores
+1. Ve al menú lateral izquierdo y selecciona **`Gestión de Personal`**.
+2. Haz clic en **Editar** (icono de lápiz ✏️) en el colaborador deseado.
+3. Desplázate al pie del modal hasta la sección **`Plantillas de Turnos Posibles`**.
+4. Cada turno posible posee una casilla circular de tipo **Radio Button**. Haz clic en el círculo del turno que deseas marcar como **⭐️ Principal**.
+5. Presiona **`Guardar Cambios`** para registrar la prioridad en Supabase.
 
-### 5.3. Gestión de Repositorios (Git Multi-Remoto)
+### 6.3. Copias de Seguridad de Versiones (`Versiones anteriores`)
+Antes de cada compilación de distribución (`npm run build`) o cambios críticos, se realiza una copia de seguridad del directorio `dist/` a la carpeta `Versiones anteriores/` asignándole un nombre de versión descriptivo (ej. `dist_pre_primary_radio_indicator_2026_07_23`).
+
+### 6.4. Gestión de Repositorios (Git Multi-Remoto)
 El código fuente de este proyecto se gestiona de forma centralizada en dos repositorios remotos:
 1. **`origin`**: Repositorio principal de desarrollo (`https://github.com/AstudillaJS/Planificador-de-turnos.git`).
 2. **`lynxok`**: Repositorio de la organización/cuenta Lynx (`https://github.com/lynxok/Planificador-de-turnos-.git`).
-* Al realizar una subida de versión, se debe empujar a ambos destinos para mantener la copia del código sincronizada:
-  ```bash
-  git push origin main
-  git push lynxok main
-  ```
 
----
-
-## 6. Monitoreo y Solución de Problemas
-
-* **Los gráficos de demanda muestran 0 pacientes o curvas vacías**:
-  * Verifica tu conexión a Internet. El planificador ahora consulta Supabase en la nube en cada inicio.
-  * Si es la primera vez que inicializas el sistema en una base limpia, asegúrate de presionar el botón **"Sincronizar Turnos"** para cargar los datos históricos desde la turnera FTP.
-* **Error de conexión FTPS**:
-  * Si la sincronización manual falla, comprueba que las credenciales FTP en el archivo `.env` o en `server.ts` siguen vigentes y que el servidor `turnera-040626z.iteosrl.com.ar` se encuentra en línea.
-* **Puerto en uso (Bloqueo al iniciar)**:
-  * Si al abrir el planificador los datos no cargan o sale pantalla de error, ejecuta `Detener_Planificador.bat` para limpiar los procesos colgados de Node y vuelve a iniciarlo.
+Para empujar los cambios de la rama activa:
+```bash
+git push origin Reloj-de-horas-1
+git push lynxok Reloj-de-horas-1
+```

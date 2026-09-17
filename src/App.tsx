@@ -26,6 +26,10 @@ import { DemandCalculatorModal } from './components/DemandCalculatorModal';
 import { AttendanceTrackerModal } from './components/AttendanceTrackerModal';
 import { ThemeSelectorPopover } from './components/ThemeSelectorPopover';
 import { StaffManagement } from './components/StaffManagement';
+import { ReportGenerator } from './components/ReportGenerator';
+import { ReportBot } from './components/ReportBot';
+import { GuardiasCalculator } from './components/GuardiasCalculator';
+import { AdmisionPlanner } from './components/AdmisionPlanner';
 import { THEMES } from './themes';
 
 // Icons
@@ -49,7 +53,10 @@ import {
   CalendarDays,
   BarChart3,
   Users,
-  History
+  History,
+  ShieldCheck,
+  Copy,
+  Briefcase
 } from 'lucide-react';
 
 import { SyncLogsModal } from './components/SyncLogsModal';
@@ -87,7 +94,7 @@ export default function App() {
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff' | 'reports'>('day');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [showResourceSidebar, setShowResourceSidebar] = useState<boolean>(true);
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState<boolean>(false);
@@ -322,6 +329,105 @@ export default function App() {
     } catch (error) {
       console.error('Failed manual save', error);
       alert('Ocurrió un error al intentar guardar la planificación en la base de datos.');
+    }
+  };
+
+  const handleLoadPrimaryShifts = () => {
+    let loadedCount = 0;
+    const newShifts = [...shifts];
+
+    // Iteramos personas
+    persons.forEach(person => {
+      // 1. Filtrar si la persona pertenece al área activa (si no es 'Todos')
+      if (activeArea !== 'Todos' && person.area !== activeArea) return;
+
+      // 2. Verificar si la persona ya tiene algún turno (regular o ausencia de vacaciones/enfermedad) en este día
+      const hasShiftToday = newShifts.some(s => s.personId === person.id && s.date === activeDate);
+      if (hasShiftToday) return; // Si ya está asignada o ausente, la ignoramos
+
+      // 3. Cargar el turno principal (marcado con isPrimary, o el primero por defecto)
+      if (person.possibleShifts && person.possibleShifts.length > 0) {
+        const primary = person.possibleShifts.find(ps => ps.isPrimary) || person.possibleShifts[0];
+        const newShiftId = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        
+        newShifts.push({
+          id: newShiftId,
+          personId: person.id,
+          date: activeDate,
+          startHour: primary.startHour,
+          duration: primary.duration,
+          area: person.area
+        });
+        loadedCount++;
+      }
+    });
+
+    if (loadedCount > 0) {
+      setShifts(newShifts);
+      saveToLocalStorage(persons, newShifts, targets);
+      setHasUnsavedChanges(true);
+      alert(`¡Carga Exitosa! Se cargaron los turnos principales para ${loadedCount} personas en el día ${activeDate}. Recuerda guardar los cambios.`);
+    } else {
+      alert("No se cargaron nuevos turnos. Todos los integrantes activos del área ya tienen turnos asignados (o ausencias registradas) para hoy.");
+    }
+  };
+
+  const handleReplicateWeek = () => {
+    // 1. Obtener las fechas de lunes a domingo de la semana actual
+    const currentWeekDates = getWeekDates(activeDate);
+    const workDays = currentWeekDates.slice(0, 5); // Lunes a Viernes
+
+    // 2. Calcular los días correspondientes de la semana siguiente (sumando 7 días)
+    const nextWeekDates = workDays.map(dateStr => {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    });
+
+    // 3. Filtrar todos los turnos asignados de Lunes a Viernes en la semana actual para el área activa
+    const currentWeekShifts = shifts.filter(s => 
+      workDays.includes(s.date) && (activeArea === 'Todos' || s.area === activeArea)
+    );
+
+    if (currentWeekShifts.length === 0) {
+      alert("No se encontraron turnos de Lunes a Viernes cargados en la semana actual para copiar.");
+      return;
+    }
+
+    const newShifts = [...shifts];
+    let copiedCount = 0;
+
+    // 4. Mapear cada turno a la fecha equivalente de la semana siguiente
+    currentWeekShifts.forEach(s => {
+      const dayIdx = workDays.indexOf(s.date);
+      const targetDate = nextWeekDates[dayIdx];
+
+      // Evitar duplicaciones: verificar si esta persona ya tiene un turno ese día
+      const alreadyHasShift = newShifts.some(ns => ns.personId === s.personId && ns.date === targetDate);
+      if (alreadyHasShift) return;
+
+      const newShiftId = 's_rep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      newShifts.push({
+        id: newShiftId,
+        personId: s.personId,
+        date: targetDate,
+        startHour: s.startHour,
+        duration: s.duration,
+        area: s.area
+      });
+      copiedCount++;
+    });
+
+    if (copiedCount > 0) {
+      setShifts(newShifts);
+      saveToLocalStorage(persons, newShifts, targets);
+      setHasUnsavedChanges(true);
+      alert(`¡Replicación Exitosa! Se copiaron ${copiedCount} turnos de Lunes a Viernes a la semana siguiente (desde el Lunes ${nextWeekDates[0]} al Viernes ${nextWeekDates[4]}). Las guardias de fin de semana no fueron alteradas. Recuerda guardar los cambios.`);
+    } else {
+      alert("No se copiaron turnos nuevos. Todos los colaboradores ya tienen turnos programados en los días equivalentes de la semana siguiente.");
     }
   };
 
@@ -1132,6 +1238,32 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setViewMode('guardias')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'guardias'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Liquidador de Guardias"
+          >
+            <ShieldCheck size={16} />
+            {isSidebarExpanded && <span>Guardias Residentes</span>}
+          </button>
+
+          <button
+            onClick={() => setViewMode('admision')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'admision'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Planificación de Admisión 24/7"
+          >
+            <Briefcase size={16} />
+            {isSidebarExpanded && <span>Admisión 24/7</span>}
+          </button>
+
+          <button
             onClick={() => setViewMode('analysis')}
             className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
               viewMode === 'analysis'
@@ -1155,6 +1287,19 @@ export default function App() {
           >
             <Users size={16} />
             {isSidebarExpanded && <span>Gestión de Personal</span>}
+          </button>
+
+          <button
+            onClick={() => setViewMode('reports')}
+            className={`flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              viewMode === 'reports'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Extractor de Reportes"
+          >
+            <FileSpreadsheet size={16} />
+            {isSidebarExpanded && <span>Extractor Reportes</span>}
           </button>
         </div>
 
@@ -1183,7 +1328,7 @@ export default function App() {
         <header className={`${activeTheme.headerBg} ${activeTheme.headerBorder} ${activeTheme.headerText} px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-4 sticky top-0 z-40 shrink-0 transition-colors duration-300 shadow-sm`}>
           <div className="flex flex-col">
             <h1 className="text-base font-extrabold tracking-tight">
-              {viewMode === 'day' ? 'Planificador Diario' : viewMode === 'week' ? 'Planificador Semanal' : viewMode === 'analysis' ? 'Análisis Estadístico e Histórico' : 'Módulo de Gestión de Personal'}
+              {viewMode === 'day' ? 'Planificador Diario' : viewMode === 'week' ? 'Planificador Semanal' : viewMode === 'analysis' ? 'Análisis Estadístico e Histórico' : viewMode === 'reports' ? 'Extractor de Reportes Personalizados' : viewMode === 'bot' ? 'Asistente de Datos con IA' : viewMode === 'guardias' ? 'Liquidador de Guardias Residentes' : viewMode === 'admision' ? 'Planificador de Admisión 24/7' : 'Módulo de Gestión de Personal'}
             </h1>
             <p className={`text-[10px] ${activeTheme.headerSubtext}`}>
               {activeMonthName} {currentYear} • {persons.length} Colaboradores
@@ -1253,6 +1398,24 @@ export default function App() {
                 </button>
               </div>
 
+              <button
+                onClick={handleLoadPrimaryShifts}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-indigo-500/30"
+                title="Carga el primer turno predefinido para todo el personal que esté libre hoy"
+              >
+                <Sparkles size={13} className="text-indigo-150 animate-pulse" />
+                <span>Cargar Principales</span>
+              </button>
+
+              <button
+                onClick={handleReplicateWeek}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-650 hover:bg-indigo-705 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md border border-indigo-500/30"
+                title="Copia los turnos de Lunes a Viernes de la semana actual a la semana siguiente (las guardias de fin de semana se cargan aparte)"
+              >
+                <Copy size={13} className="text-indigo-100" />
+                <span>Replicar Semana (Lun-Vie)</span>
+              </button>
+
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1288,7 +1451,7 @@ export default function App() {
                 <span>Importar Excel</span>
               </button>
 
-              {viewMode !== 'analysis' && viewMode !== 'staff' && (
+              {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && viewMode !== 'bot' && viewMode !== 'guardias' && viewMode !== 'admision' && (
                 <>
                   <button
                     onClick={handleAutoBalanceCoverage}
@@ -1323,7 +1486,7 @@ export default function App() {
         </header>
 
         {/* 2. Interactive Month Date Navigator bar */}
-        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+        {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && viewMode !== 'bot' && viewMode !== 'guardias' && viewMode !== 'admision' && (
           <div className={`${activeTheme.cardBg} ${activeTheme.cardBorder} border-b py-2 px-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 transition-colors duration-300`}>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center bg-slate-100 border border-slate-200/80 p-1 rounded-xl shadow-xs">
@@ -1401,7 +1564,7 @@ export default function App() {
         )}
 
         {/* Calendar Days Horizon Carousel */}
-        {viewMode !== 'analysis' && viewMode !== 'staff' && (
+        {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && viewMode !== 'bot' && viewMode !== 'guardias' && viewMode !== 'admision' && (
           <div className="px-6 py-2 border-b border-slate-150 shrink-0 bg-white">
             <div ref={carouselRef} className="flex items-center gap-1.5 max-w-full overflow-x-auto py-1 custom-scrollbar">
               {monthDays.map((day: CalendarDay) => {
@@ -1495,7 +1658,7 @@ export default function App() {
                   <span className={`text-xs font-bold ${activeTheme.cardText} font-sans`}>Reporte Estadístico e Histórico Consolidador</span>
                 </div>
                 <a 
-                  href={`./analisis_turnos.html?theme=${activeThemeId}`} 
+                  href={`./analisis_turnos.html?v=1.1.2&theme=${activeThemeId}`} 
                   target="_blank" 
                   rel="noreferrer"
                   className={`text-[11px] font-bold ${activeTheme.themeHighlightText} hover:opacity-80 flex items-center gap-1 transition-colors`}
@@ -1504,7 +1667,7 @@ export default function App() {
                 </a>
               </div>
               <iframe 
-                src={`./analisis_turnos.html?theme=${activeThemeId}`} 
+                src={`./analisis_turnos.html?v=1.1.2&theme=${activeThemeId}`} 
                 className="w-full border-0 rounded-b-2xl" 
                 style={{ height: '1700px' }}
                 scrolling="no"
@@ -1535,7 +1698,29 @@ export default function App() {
               onDeletePerson={handleDeletePersonFromDb}
               theme={activeTheme}
             />
-          ) : (
+            ) : viewMode === 'reports' ? (
+              <ReportGenerator theme={activeTheme} />
+            ) : viewMode === 'bot' ? (
+              <div className="flex-1 w-full animate-fade-in h-[calc(100vh-140px)]">
+                <ReportBot />
+              </div>
+            ) : viewMode === 'guardias' ? (
+              <GuardiasCalculator theme={activeTheme} />
+            ) : viewMode === 'admision' ? (
+              <div className="flex-1 w-full animate-fade-in h-full">
+                <AdmisionPlanner 
+                  theme={activeTheme} 
+                  persons={persons} 
+                  setPersons={setPersons} 
+                  shifts={shifts} 
+                  setShifts={setShifts} 
+                  areas={areas}
+                  onSave={handleManualSave}
+targets={targets}
+demand={demand} 
+                />
+              </div>
+            ) : (
             <>
               {/* Left column: People sidebar (Manage resources) - Colapsable */}
               {showResourceSidebar ? (
@@ -1589,7 +1774,7 @@ export default function App() {
               )}
 
               {/* Right column: Interactive scheduler sheet & coverage graph */}
-              <div className="flex-1 flex flex-col gap-6">
+              <div className="flex-1 min-w-0 flex flex-col gap-6">
                 
                 {/* Areas Filtering tabs & Timeline controls */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-150 shadow-xs">
@@ -1740,7 +1925,7 @@ export default function App() {
         preselectedPersonId={preselectedPersonId}
         onSave={handleSaveModalShift}
         onDelete={modalShift ? () => handleDeleteShift(modalShift.id) : undefined}
-        areas={activeAreasList}
+        areas={[...activeAreasList, 'VACACIONES', 'ENFERMEDAD']}
       />
 
       <ExcelImporterModal
@@ -1798,3 +1983,4 @@ export default function App() {
     </div>
   );
 }
+

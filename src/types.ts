@@ -9,7 +9,7 @@ export interface Person {
   availabilityEnd: number;   // e.g., 18 (18:00)
   color: string;             // Tailwind color class prefix (e.g., "blue", "teal")
   legajo?: string;           // Custom corporate registration ID
-  possibleShifts?: { startHour: number; duration: number }[];
+  possibleShifts?: { startHour: number; duration: number; isPrimary?: boolean }[];
 }
 
 export interface Shift {

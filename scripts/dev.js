@@ -12,7 +12,7 @@ const backend = spawn('cmd.exe', ['/c', 'npx tsx backend/server.ts'], {
 });
 
 // Start frontend with --open flag
-const frontend = spawn('cmd.exe', ['/c', 'npx vite --port=3020 --host=0.0.0.0 --open'], {
+const frontend = spawn('cmd.exe', ['/c', 'npx vite --port=3751 --host=0.0.0.0 --open'], {
   cwd: root,
   stdio: 'inherit'
 });

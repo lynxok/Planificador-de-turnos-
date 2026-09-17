@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Area, Shift, Person, DemandRecord } from '../types';
 import { formatHour, getHourRange, calculateCoverage } from '../utils';
+import { supabaseControl } from '../supabase';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -101,6 +102,72 @@ export function CoverageChart({
   activeDate,
 }: CoverageChartProps) {
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [hourlyPatientsStats, setHourlyPatientsStats] = useState<{
+    art: number[];
+    os: number[];
+    particular: number[];
+  }>({
+    art: Array(24).fill(0),
+    os: Array(24).fill(0),
+    particular: Array(24).fill(0)
+  });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchStats() {
+      if (!activeDate) return;
+      setLoadingStats(true);
+      try {
+        const { data, error } = await supabaseControl
+          .from('planning_patient_appointments')
+          .select('turno, cobertura')
+          .gte('turno', `${activeDate}T00:00:00`)
+          .lte('turno', `${activeDate}T23:59:59`);
+
+        if (error) throw error;
+
+        const artArr = Array(24).fill(0);
+        const osArr = Array(24).fill(0);
+        const partArr = Array(24).fill(0);
+
+        if (data) {
+          data.forEach((item: any) => {
+            if (!item.turno) return;
+            const hourPart = item.turno.split('T')[1];
+            if (!hourPart) return;
+            const hour = parseInt(hourPart.split(':')[0], 10);
+            if (isNaN(hour) || hour < 0 || hour >= 24) return;
+
+            const rawClase = (item.cobertura || '').toUpperCase();
+            if (rawClase.includes('ART')) {
+              artArr[hour]++;
+            } else if (rawClase.includes('OBRA') || rawClase.includes('OS') || rawClase.includes('SOCIAL')) {
+              osArr[hour]++;
+            } else {
+              partArr[hour]++;
+            }
+          });
+        }
+
+        if (isMounted) {
+          setHourlyPatientsStats({ art: artArr, os: osArr, particular: partArr });
+        }
+      } catch (err) {
+        console.error("Error fetching hourly patients stats for coverage:", err);
+      } finally {
+        if (isMounted) {
+          setLoadingStats(false);
+        }
+      }
+    }
+
+    fetchStats();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDate]);
+
   const [isQuickLoaderOpen, setIsQuickLoaderOpen] = useState(false);
   const [quickLoaderTab, setQuickLoaderTab] = useState<'paste' | 'excel'>('paste');
   const [pasteText, setPasteText] = useState('');
@@ -729,15 +796,16 @@ export function CoverageChart({
       </div>
 
       {/* Segment 3: GRÁFICO DE COBERTURA Y ANÁLISIS DE TURNOS POR HORA HOY */}
-      <div className="space-y-4 relative z-10">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-extrabold tracking-wider uppercase text-[#d4af37]">
-            Gráfico de Cobertura por Hora y Flujo de Turnos (Entradas / Salidas)
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-            <HelpCircle size={11} /> Pasa el cursor sobre las columnas para ver los nombres y detalles de ingresos.
-          </span>
-        </div>
+      <div className="space-y-4 relative z-10 w-full overflow-x-auto custom-scrollbar">
+        <div className="min-w-[920px] space-y-4">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-extrabold tracking-wider uppercase text-[#d4af37]">
+              Gráfico de Cobertura por Hora y Flujo de Turnos (Entradas / Salidas)
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+              <HelpCircle size={11} /> Pasa el cursor sobre las columnas para ver los nombres y detalles de ingresos.
+            </span>
+          </div>
 
         <div className="relative">
           {/* Líneas de guía de fondo */}
@@ -748,7 +816,7 @@ export function CoverageChart({
           </div>
 
           {/* Columnas del gráfico */}
-          <div className="grid grid-cols-24 gap-1.5 pt-4 pb-2 items-end min-h-[170px] px-1 relative z-15 overflow-x-auto overflow-y-hidden select-none custom-scrollbar">
+          <div className="grid grid-cols-24 gap-1.5 pt-4 pb-2 items-end min-h-[170px] px-1 relative z-15 select-none">
             {hourRange.map((hour, idx) => {
               const actual = actualCoverage[idx];
               const target = effectiveTargetCount[idx];
@@ -977,6 +1045,63 @@ export function CoverageChart({
             </div>
           </div>
 
+          {/* Fila 2.1: Turnos Pacientes ART */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-rose-455 text-rose-405 text-rose-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <span>Turnos Pacientes ART:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.art[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fila 2.2: Turnos Pacientes OS */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-indigo-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <span>Turnos Pacientes OS:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.os[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-indigo-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fila 2.3: Turnos Pacientes Particular */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span>Turnos Pacientes Particular:</span>
+              {loadingStats && <span className="text-[8px] text-slate-500 animate-pulse">(cargando...)</span>}
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = hourlyPatientsStats.particular[hour] || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Fila 3: Tiempo Teórico de Espera */}
           <div className="space-y-1 border-t border-white/5 pt-2">
             <div className="font-bold text-sky-405 uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-sky-400">
@@ -1017,6 +1142,7 @@ export function CoverageChart({
             </div>
           </div>
 
+          </div>
         </div>
       </div>
     </div>

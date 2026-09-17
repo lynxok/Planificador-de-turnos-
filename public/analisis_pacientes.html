@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Pacientes - ITEO</title>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="bootstrap.min.css" rel="stylesheet">
+    <script src="chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e1b4b 100%);
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            min-height: 100vh;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card-header-premium {
+            background: rgba(15, 23, 42, 0.4);
+            border-bottom: 1px solid var(--card-border);
+            padding: 12px 18px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .filter-select {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            font-size: 0.78rem;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        .chart-container-box {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            padding: 8px;
+        }
+        
+        .chart-container-box-large {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            padding: 8px;
+        }
+
+        /* Overlay de Carga */
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #090d16; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .spinner-custom {
+            width: 48px; height: 48px;
+            border: 4px solid rgba(99, 102, 241, 0.15);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Theming classes same as analisis_turnos */
+        body.theme-minimal {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-color: #4f46e5;
+        }
+        body.theme-minimal .stat-value {
+            background: linear-gradient(to right, #0f172a, #334155) !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+    </style>
+</head>
+<body class="theme-minimal">
+    <div id="loadingOverlay">
+        <div class="spinner-custom mb-3"></div>
+        <h5 class="text-white font-weight-bold">Procesando Base de Pacientes...</h5>
+        <p class="text-muted" style="font-size: 0.8rem;">Obteniendo historial detallado.</p>
+    </div>
+
+    <div class="container-fluid py-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="m-0 font-weight-extrabold" style="letter-spacing: -0.01em;">Dashboard: Análisis de Pacientes</h4>
+                <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación por paciente único conectado a Supabase</p>
+            </div>
+            <div>
+                <a href="analisis_turnos.html" class="btn btn-outline-secondary" style="font-size: 0.8rem;">Volver a Análisis de Turnos</a>
+            </div>
+        </div>
+        
+        <div class="glass-card p-3 mb-4">
+            <div class="row row-cols-2 row-cols-md-4 g-2 align-items-end">
+                <div class="col">
+                    <div class="stat-label">Desde</div>
+                    <input type="date" id="dateDesde" class="form-control filter-select" />
+                </div>
+                <div class="col">
+                    <div class="stat-label">Hasta</div>
+                    <input type="date" id="dateHasta" class="form-control filter-select" />
+                </div>
+                <div class="col">
+                    <button class="btn w-100" style="background-color: var(--accent-color); color: white; font-weight: 600; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; border: none; height: 36px;" onclick="fetchData()">🔍 Buscar</button>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Médico</div>
+                    <select id="medicoFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todos">Todos los Médicos</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Clase de Cobertura</div>
+                    <select id="claseFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todas">Todas las Clases</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Cobertura</div>
+                    <select id="coberturaFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todas">Todas las Coberturas</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <div class="stat-label">Tipo de Consulta</div>
+                    <select id="tipoFilter" class="form-select filter-select" onchange="updateDashboard()">
+                        <option value="Todos">Todos los Tipos</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Pacientes Únicos</div>
+                    <div class="stat-value" id="kpiPacientes">0</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Total RX Realizados</div>
+                    <div class="stat-value" id="kpiTotalRx" style="background: linear-gradient(to right, #fca5a5, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="stat-label">Promedio RX / Paciente</div>
+                    <div class="stat-value" id="kpiPromedioRx" style="background: linear-gradient(to right, #34d399, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0.0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="glass-card">
+                    <div class="card-header-premium">Pacientes Únicos y Rayos por Mes</div>
+                    <div class="chart-container-box-large">
+                        <canvas id="pacientesMesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Pacientes por Tipo Consulta</div>
+                    <div class="chart-container-box" style="height: 350px;">
+                        <canvas id="tipoConsultaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="glass-card">
+                    <div class="card-header-premium">Pacientes por Cobertura (Top 10)</div>
+                    <div class="chart-container-box" style="height: 350px;">
+                        <canvas id="coberturaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawAppointments = [];
+        let profToType = {};
+        
+        let pacientesMesChartInst = null;
+        let tipoConsultaChartInst = null;
+        let coberturaChartInst = null;
+
+        function applyTheme() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTheme = urlParams.get('theme') || localStorage.getItem('cov_active_theme') || 'minimal';
+            document.body.className = 'theme-' + activeTheme;
+            
+            const style = getComputedStyle(document.body);
+            Chart.defaults.color = style.getPropertyValue('--text-muted').trim() || '#94a3b8';
+            Chart.defaults.borderColor = style.getPropertyValue('--card-border').trim() || 'rgba(255, 255, 255, 0.08)';
+            Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+        }
+        applyTheme();
+
+        async function init() {
+            try {
+                Chart.register(ChartDataLabels);
+                // Fechas por defecto: últimos 6 meses
+                const hoy = new Date();
+                const hace6Meses = new Date();
+                hace6Meses.setMonth(hace6Meses.getMonth() - 6);
+                
+                document.getElementById('dateHasta').value = hoy.toISOString().split('T')[0];
+                document.getElementById('dateDesde').value = hace6Meses.toISOString().split('T')[0];
+
+                const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
+                const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+
+                // 1. Obtener mapeo de profesionales a tipo consulta
+                const profRes = await fetch(`${supabaseUrl}/rest/v1/turnera_profesionales?select=profesional,tipo_consulta`, {
+                    headers: { 
+                        'apikey': supabaseAnonKey, 
+                        'Authorization': `Bearer ${supabaseAnonKey}`,
+                        'Accept-Profile': 'control_de_horas',
+                        'Content-Profile': 'control_de_horas'
+                    }
+                });
+                const profData = await profRes.json();
+                profToType = {};
+                profData.forEach(p => {
+                    profToType[p.profesional] = p.tipo_consulta;
+                });
+
+                // 2. Traer datos
+                await fetchData();
+            } catch (err) {
+                console.error(err);
+                alert("Error cargando dashboard de pacientes");
+            }
+        }
+
+        async function fetchData() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                overlay.style.opacity = '1';
+            }
+
+            try {
+                const dateDesde = document.getElementById('dateDesde').value;
+                const dateHasta = document.getElementById('dateHasta').value;
+
+                const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
+                const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+
+                // Use paginated fetch if over 1000 records
+                let allData = [];
+                let limit = 1000;
+                let offset = 0;
+                let hasMore = true;
+
+                while(hasMore) {
+                    const res = await fetch(`${supabaseUrl}/rest/v1/planning_patient_appointments?turno=gte.${dateDesde}T00:00:00&turno=lte.${dateHasta}T23:59:59&select=paciente,profesional,cobertura,turno,nro_hc&limit=${limit}&offset=${offset}`, {
+                        headers: { 
+                            'apikey': supabaseAnonKey, 
+                            'Authorization': `Bearer ${supabaseAnonKey}`,
+                            'Accept-Profile': 'control_de_horas',
+                            'Content-Profile': 'control_de_horas'
+                        }
+                    });
+                    const data = await res.json();
+                    allData = allData.concat(data);
+                    
+                    if (data.length < limit) {
+                        hasMore = false;
+                    } else {
+                        offset += limit;
+                    }
+                }
+
+                // Append tipo_consulta and mes
+                rawAppointments = allData.map(d => {
+                    const dateObj = new Date(d.turno);
+                    const yyyy = dateObj.getFullYear();
+                    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const mes = `${yyyy}-${mm}`;
+                    const tipo = profToType[d.profesional] || 'OTRO';
+                    
+                    // Clase de cobertura simplificada (se podría mapear mejor si tenemos tabla, pero usaremos un hack para extraer)
+                    let clase = 'OTRO';
+                    if (d.cobertura) {
+                        if (d.cobertura.includes('O.S') || d.cobertura.includes('OBRA SOCIAL')) clase = 'Obra Social';
+                        else if (d.cobertura.includes('A.R.T')) clase = 'A.R.T.';
+                        else if (d.cobertura.includes('PREPAGA')) clase = 'Prepaga';
+                    }
+
+                    return { ...d, mes, tipo_consulta: tipo, clase };
+                });
+
+                populateFilters();
+                updateDashboard();
+
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.style.display = 'none', 300);
+                }
+            } catch (err) {
+                console.error(err);
+                if (overlay) {
+                    overlay.innerHTML = `<h5 class="text-danger">Error de Conexión</h5><p class="text-white">Falló la carga de datos.</p><button onclick="location.reload()">Reintentar</button>`;
+                }
+            }
+        }
+
+        function populateFilters() {
+            const clases = new Set();
+            const tipos = new Set();
+            const medicos = new Set(Object.keys(profToType));
+            const coberturas = new Set();
+
+            rawAppointments.forEach(r => {
+                if (r.clase) clases.add(r.clase);
+                if (r.tipo_consulta) tipos.add(r.tipo_consulta);
+                if (r.profesional) medicos.add(r.profesional);
+                if (r.cobertura) coberturas.add(r.cobertura);
+            });
+
+            const selectClase = document.getElementById('claseFilter');
+            selectClase.innerHTML = '<option value="Todas">Todas las Clases</option>';
+            Array.from(clases).sort().forEach(c => selectClase.innerHTML += `<option value="${c}">${c}</option>`);
+
+            const selectTipo = document.getElementById('tipoFilter');
+            selectTipo.innerHTML = '<option value="Todos">Todos los Tipos</option>';
+            Array.from(tipos).sort().forEach(t => selectTipo.innerHTML += `<option value="${t}">${t}</option>`);
+
+            const selectMedico = document.getElementById('medicoFilter');
+            selectMedico.innerHTML = '<option value="Todos">Todos los Médicos</option>';
+            Array.from(medicos).sort().forEach(m => selectMedico.innerHTML += `<option value="${m}">${m}</option>`);
+
+            const selectCobertura = document.getElementById('coberturaFilter');
+            selectCobertura.innerHTML = '<option value="Todas">Todas las Coberturas</option>';
+            Array.from(coberturas).sort().forEach(c => selectCobertura.innerHTML += `<option value="${c}">${c}</option>`);
+        }
+
+        function updateDashboard() {
+            const selectedClase = document.getElementById('claseFilter').value;
+            const selectedTipo = document.getElementById('tipoFilter').value;
+            const selectedMedico = document.getElementById('medicoFilter').value;
+            const selectedCobertura = document.getElementById('coberturaFilter').value;
+
+            let filtered = rawAppointments;
+            if (selectedClase !== 'Todas') filtered = filtered.filter(d => d.clase === selectedClase);
+            if (selectedTipo !== 'Todos') filtered = filtered.filter(d => d.tipo_consulta === selectedTipo);
+            if (selectedMedico !== 'Todos') filtered = filtered.filter(d => d.profesional === selectedMedico);
+            if (selectedCobertura !== 'Todas') filtered = filtered.filter(d => d.cobertura === selectedCobertura);
+
+            // Helper for unique ID
+            const getPatientId = (a) => {
+                const name = a.paciente ? a.paciente.trim().toUpperCase() : 'DESCONOCIDO';
+                return a.nro_hc ? `${a.nro_hc}-${name}` : name;
+            };
+
+            // Group by Patient (using Nro_HC + Name as identifier)
+            const pacientesMap = {};
+            filtered.forEach(a => {
+                const pid = getPatientId(a);
+                if (!pacientesMap[pid]) {
+                    pacientesMap[pid] = { totalTurnos: 0, totalRx: 0, meses: new Set(), tipos: new Set() };
+                }
+                pacientesMap[pid].totalTurnos++;
+                pacientesMap[pid].meses.add(a.mes);
+                pacientesMap[pid].tipos.add(a.tipo_consulta);
+                if (a.tipo_consulta === 'RAYOS') pacientesMap[pid].totalRx++;
+            });
+
+            const uniquePacientes = Object.keys(pacientesMap);
+            const totalPacientes = uniquePacientes.length;
+            const totalRx = filtered.filter(a => a.tipo_consulta === 'RAYOS').length;
+            const promedioRx = totalPacientes > 0 ? (totalRx / totalPacientes).toFixed(2) : 0;
+
+            document.getElementById('kpiPacientes').innerText = totalPacientes;
+            document.getElementById('kpiTotalRx').innerText = totalRx;
+            document.getElementById('kpiPromedioRx').innerText = promedioRx;
+
+            // Group by Month for Chart
+            const mesStats = {};
+            filtered.forEach(a => {
+                if (!mesStats[a.mes]) mesStats[a.mes] = { pacientes: new Set(), rxCount: 0 };
+                const pid = getPatientId(a);
+                mesStats[a.mes].pacientes.add(pid);
+                if (a.tipo_consulta === 'RAYOS') mesStats[a.mes].rxCount++;
+            });
+
+            const mesesArr = Object.keys(mesStats).sort();
+            const pacientesPorMes = mesesArr.map(m => mesStats[m].pacientes.size);
+            const rxPorMes = mesesArr.map(m => mesStats[m].rxCount);
+
+            const style = getComputedStyle(document.body);
+            const accentBg = style.getPropertyValue('--accent-color').trim() || '#6366f1';
+
+            if (pacientesMesChartInst) pacientesMesChartInst.destroy();
+            pacientesMesChartInst = new Chart(document.getElementById('pacientesMesChart'), {
+                type: 'bar',
+                data: {
+                    labels: mesesArr,
+                    datasets: [
+                        {
+                            label: 'Pacientes Únicos',
+                            data: pacientesPorMes,
+                            backgroundColor: accentBg,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Total Estudios RX',
+                            type: 'line',
+                            data: rxPorMes,
+                            borderColor: '#ef4444',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: {
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 11 },
+                            formatter: Math.round
+                        }
+                    }
+                }
+            });
+
+            // Group by Tipo Consulta (Unique patients per type)
+            const tipoStats = {};
+            filtered.forEach(a => {
+                const t = a.tipo_consulta;
+                if (!tipoStats[t]) tipoStats[t] = new Set();
+                tipoStats[t].add(getPatientId(a));
+            });
+
+            const tiposArr = Object.keys(tipoStats).sort((a,b) => tipoStats[b].size - tipoStats[a].size);
+            const pacientesPorTipo = tiposArr.map(t => tipoStats[t].size);
+
+            if (tipoConsultaChartInst) tipoConsultaChartInst.destroy();
+            tipoConsultaChartInst = new Chart(document.getElementById('tipoConsultaChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: tiposArr,
+                    datasets: [{
+                        data: pacientesPorTipo,
+                        backgroundColor: ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#64748b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { font: { size: 10 } } },
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => value > 0 ? value : ''
+                        }
+                    }
+                }
+            });
+
+            // Group by Cobertura
+            const cobStats = {};
+            filtered.forEach(a => {
+                const c = a.cobertura || 'SIN COBERTURA';
+                if (!cobStats[c]) cobStats[c] = new Set();
+                cobStats[c].add(getPatientId(a));
+            });
+
+            const cobArr = Object.keys(cobStats).sort((a,b) => cobStats[b].size - cobStats[a].size).slice(0, 10);
+            const pacientesPorCob = cobArr.map(c => cobStats[c].size);
+
+            if (coberturaChartInst) coberturaChartInst.destroy();
+            coberturaChartInst = new Chart(document.getElementById('coberturaChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: cobArr,
+                    datasets: [{
+                        data: pacientesPorCob,
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#64748b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { font: { size: 10 } } },
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => value > 0 ? value : ''
+                        }
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

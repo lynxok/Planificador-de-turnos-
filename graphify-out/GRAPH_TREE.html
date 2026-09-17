@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>/ — graphify tree viewer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0 0 24px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #1e3a56;
+    }
+    .controls {
+      margin: 20px 0 15px 24px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 8px 18px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:active {
+      background: #004085;
+    }
+    #tree-container {
+      width: calc(100vw - 48px); /* Adjust for body margin/padding */
+      height: 85vh;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      margin-left: 24px;
+      margin-right: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #ddd;
+    }
+    svg {
+      background: #fff;
+      border-radius: 8px;
+      display: block; /* Important for D3 */
+    }
+    .node circle {
+      stroke-width: 2.5px;
+    }
+    .node text { /* Base style for the <text> container */
+      font: 13px 'Segoe UI', sans-serif;
+      paint-order: stroke fill; /* Ensures text is readable over lines */
+      stroke: #fff; /* White halo */
+      stroke-width: 3px; /* Halo thickness */
+      stroke-linejoin: round;
+      stroke-opacity: 0.85; /* Halo opacity */
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.7;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>/ — Knowledge Graph</h1>
+  <div class="controls">
+    <button onclick="expandAll()">Expand All</button>
+    <button onclick="collapseAll()">Collapse All</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  <div id="tree-container">
+    <svg id="tree-svg" width="6000" height="8000"></svg>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const initialJsonData = {"name":"/","total_count":1253,"children":[{"name":"backend","total_count":28,"children":[{"name":"db.ts","total_count":4,"children":[{"name":"__dirname","total_count":1,"children":[]},{"name":"__filename","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]},{"name":"query()","total_count":1,"children":[]}]},{"name":"server.ts","total_count":24,"children":[{"name":".add()","total_count":1,"children":[]},{"name":".runNext()","total_count":1,"children":[]},{"name":"__dirname","total_count":1,"children":[]},{"name":"__filename","total_count":1,"children":[]},{"name":"app","total_count":1,"children":[]},{"name":"appointmentsCache","total_count":1,"children":[]},{"name":"appointmentsSummaryCache","total_count":1,"children":[]},{"name":"areasCache","total_count":1,"children":[]},{"name":"attendanceCache","total_count":1,"children":[]},{"name":"coveragesCache","total_count":1,"children":[]},{"name":"demandCache","total_count":1,"children":[]},{"name":"fetchAllFromSupabase()","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"ftpQueue","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"parseExcelDateTimeForUpsert()","total_count":1,"children":[]},{"name":"personsCache","total_count":1,"children":[]},{"name":"professionalsCache","total_count":1,"children":[]},{"name":"shiftsCache","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"syncFromFtpInternal()","total_count":1,"children":[]},{"name":"targetsCache","total_count":1,"children":[]},{"name":"TaskQueue","total_count":1,"children":[]},{"name":"uploadToFtpInternal()","total_count":1,"children":[]}]}]},{"name":"package.json","total_count":59,"children":[{"name":"@google/genai","total_count":1,"children":[]},{"name":"@google/genai","total_count":1,"children":[]},{"name":"@supabase/supabase-js","total_count":1,"children":[]},{"name":"@supabase/supabase-js","total_count":1,"children":[]},{"name":"@tailwindcss/vite","total_count":1,"children":[]},{"name":"@tailwindcss/vite","total_count":1,"children":[]},{"name":"@types/express","total_count":1,"children":[]},{"name":"@types/express","total_count":1,"children":[]},{"name":"@types/node","total_count":1,"children":[]},{"name":"@types/node","total_count":1,"children":[]},{"name":"@types/pg","total_count":1,"children":[]},{"name":"@types/pg","total_count":1,"children":[]},{"name":"@vitejs/plugin-react","total_count":1,"children":[]},{"name":"@vitejs/plugin-react","total_count":1,"children":[]},{"name":"autoprefixer","total_count":1,"children":[]},{"name":"autoprefixer","total_count":1,"children":[]},{"name":"basic-ftp","total_count":1,"children":[]},{"name":"basic-ftp","total_count":1,"children":[]},{"name":"build","total_count":1,"children":[]},{"name":"chart.js","total_count":1,"children":[]},{"name":"chart.js","total_count":1,"children":[]},{"name":"clean","total_count":1,"children":[]},{"name":"dependencies","total_count":1,"children":[]},{"name":"dev","total_count":1,"children":[]},{"name":"devDependencies","total_count":1,"children":[]},{"name":"dotenv","total_count":1,"children":[]},{"name":"dotenv","total_count":1,"children":[]},{"name":"esbuild","total_count":1,"children":[]},{"name":"esbuild","total_count":1,"children":[]},{"name":"express","total_count":1,"children":[]},{"name":"express","total_count":1,"children":[]},{"name":"lint","total_count":1,"children":[]},{"name":"lucide-react","total_count":1,"children":[]},{"name":"lucide-react","total_count":1,"children":[]},{"name":"motion","total_count":1,"children":[]},{"name":"motion","total_count":1,"children":[]},{"name":"name","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"preview","total_count":1,"children":[]},{"name":"private","total_count":1,"children":[]},{"name":"react","total_count":1,"children":[]},{"name":"react","total_count":1,"children":[]},{"name":"react-dom","total_count":1,"children":[]},{"name":"react-dom","total_count":1,"children":[]},{"name":"scripts","total_count":1,"children":[]},{"name":"tailwindcss","total_count":1,"children":[]},{"name":"tailwindcss","total_count":1,"children":[]},{"name":"tsx","total_count":1,"children":[]},{"name":"tsx","total_count":1,"children":[]},{"name":"type","total_count":1,"children":[]},{"name":"typescript","total_count":1,"children":[]},{"name":"typescript","total_count":1,"children":[]},{"name":"version","total_count":1,"children":[]},{"name":"vite","total_count":1,"children":[]},{"name":"vite","total_count":1,"children":[]},{"name":"vite","total_count":1,"children":[]},{"name":"xlsx","total_count":1,"children":[]},{"name":"xlsx","total_count":1,"children":[]}]},{"name":"public","total_count":721,"children":[{"name":"chart.umd.js","total_count":721,"children":[{"name":"(+521 more)","total_count":521,"children":[]},{"name":"._animateOptions()","total_count":1,"children":[]},{"name":"._cachedScopes()","total_count":1,"children":[]},{"name":"._calculatePadding()","total_count":1,"children":[]},{"name":"._callHooks()","total_count":1,"children":[]},{"name":"._checkEventBindings()","total_count":1,"children":[]},{"name":"._circumference()","total_count":1,"children":[]},{"name":"._computeAngle()","total_count":1,"children":[]},{"name":"._computeGridLineItems()","total_count":1,"children":[]},{"name":"._computeLabelArea()","total_count":1,"children":[]},{"name":"._computeLabelItems()","total_count":1,"children":[]},{"name":"._computeLabelSizes()","total_count":1,"children":[]},{"name":"._computeTitleHeight()","total_count":1,"children":[]},{"name":"._convertTicksToLabels()","total_count":1,"children":[]},{"name":"._createAnimations()","total_count":1,"children":[]},{"name":"._createDescriptors()","total_count":1,"children":[]},{"name":"._createItems()","total_count":1,"children":[]},{"name":"._dataCheck()","total_count":1,"children":[]},{"name":"._descriptors()","total_count":1,"children":[]},{"name":"._destroy()","total_count":1,"children":[]},{"name":"._destroyDatasetMeta()","total_count":1,"children":[]},{"name":"._drawArgs()","total_count":1,"children":[]},{"name":"._drawColorBox()","total_count":1,"children":[]},{"name":"._drawDataset()","total_count":1,"children":[]},{"name":"._drawDatasets()","total_count":1,"children":[]},{"name":"._each()","total_count":1,"children":[]},{"name":"._eventHandler()","total_count":1,"children":[]},{"name":"._exec()","total_count":1,"children":[]},{"name":"._fitCols()","total_count":1,"children":[]},{"name":"._fitRows()","total_count":1,"children":[]},{"name":"._generate()","total_count":1,"children":[]},{"name":"._get()","total_count":1,"children":[]},{"name":"._getAnims()","total_count":1,"children":[]},{"name":"._getCircumference()","total_count":1,"children":[]},{"name":"._getLabelBounds()","total_count":1,"children":[]},{"name":"._getLabelCapacity()","total_count":1,"children":[]},{"name":"._getLabelSize()","total_count":1,"children":[]},{"name":"._getLabelSizes()","total_count":1,"children":[]},{"name":"._getLegendItemAt()","total_count":1,"children":[]},{"name":"._getOtherScale()","total_count":1,"children":[]},{"name":"._getRegistryForType()","total_count":1,"children":[]},{"name":"._getRingWeight()","total_count":1,"children":[]},{"name":"._getRingWeightOffset()","total_count":1,"children":[]},{"name":"._getRotation()","total_count":1,"children":[]},{"name":"._getRotationExtents()","total_count":1,"children":[]},{"name":"._getSortedDatasetMetas()","total_count":1,"children":[]},{"name":"._getUniformDataChanges()","total_count":1,"children":[]},{"name":"._getVisibleDatasetWeightTotal()","total_count":1,"children":[]},{"name":"._getXAxisLabelAlignment()","total_count":1,"children":[]},{"name":"._getYAxisLabelAlignment()","total_count":1,"children":[]},{"name":"._handleEvent()","total_count":1,"children":[]},{"name":"._handleMargins()","total_count":1,"children":[]},{"name":"._initialize()","total_count":1,"children":[]},{"name":"._insertElements()","total_count":1,"children":[]},{"name":"._isVisible()","total_count":1,"children":[]},{"name":"._layers()","total_count":1,"children":[]},{"name":"._maxDigits()","total_count":1,"children":[]},{"name":"._notify()","total_count":1,"children":[]},{"name":"._notify()","total_count":1,"children":[]},{"name":"._notifyStateChanges()","total_count":1,"children":[]},{"name":"._onDataPop()","total_count":1,"children":[]},{"name":"._onDataPush()","total_count":1,"children":[]},{"name":"._onDataShift()","total_count":1,"children":[]},{"name":"._onDataSplice()","total_count":1,"children":[]},{"name":"._onDataUnshift()","total_count":1,"children":[]},{"name":"._positionChanged()","total_count":1,"children":[]},{"name":"._refresh()","total_count":1,"children":[]},{"name":"._removeDatasetHoverStyle()","total_count":1,"children":[]},{"name":"._removeElements()","total_count":1,"children":[]},{"name":"._removeUnreferencedMetasets()","total_count":1,"children":[]},{"name":"._resetElements()","total_count":1,"children":[]},{"name":"._resolveAnimations()","total_count":1,"children":[]},{"name":"._resolveAnimations()","total_count":1,"children":[]},{"name":"._resolveElementOptions()","total_count":1,"children":[]},{"name":"._resolveTickFontOptions()","total_count":1,"children":[]},{"name":"._resyncElements()","total_count":1,"children":[]},{"name":"._setDatasetHoverStyle()","total_count":1,"children":[]},{"name":"._setStyle()","total_count":1,"children":[]},{"name":"._sync()","total_count":1,"children":[]},{"name":"._tickFormatFunction()","total_count":1,"children":[]},{"name":"._tickSize()","total_count":1,"children":[]},{"name":"._update()","total_count":1,"children":[]},{"name":"._update()","total_count":1,"children":[]},{"name":"._updateAnimationTarget()","total_count":1,"children":[]},{"name":"._updateDataset()","total_count":1,"children":[]},{"name":"._updateDatasets()","total_count":1,"children":[]},{"name":"._updateHiddenIndices()","total_count":1,"children":[]},{"name":"._updateHoverStyles()","total_count":1,"children":[]},{"name":"._updateLayout()","total_count":1,"children":[]},{"name":"._updateMetasets()","total_count":1,"children":[]},{"name":"._updateRadius()","total_count":1,"children":[]},{"name":"._updateScales()","total_count":1,"children":[]},{"name":"._updateVisibility()","total_count":1,"children":[]},{"name":"._willRender()","total_count":1,"children":[]},{"name":".acquireContext()","total_count":1,"children":[]},{"name":".acquireContext()","total_count":1,"children":[]},{"name":".acquireContext()","total_count":1,"children":[]},{"name":".active()","total_count":1,"children":[]},{"name":".add()","total_count":1,"children":[]},{"name":".add()","total_count":1,"children":[]},{"name":".add()","total_count":1,"children":[]},{"name":".addControllers()","total_count":1,"children":[]},{"name":".addElements()","total_count":1,"children":[]},{"name":".addElements()","total_count":1,"children":[]},{"name":".addEventListener()","total_count":1,"children":[]},{"name":".addEventListener()","total_count":1,"children":[]},{"name":".addPlugins()","total_count":1,"children":[]},{"name":".addScales()","total_count":1,"children":[]},{"name":".adjustHitBoxes()","total_count":1,"children":[]},{"name":".afterAutoSkip()","total_count":1,"children":[]},{"name":".afterAutoSkip()","total_count":1,"children":[]},{"name":".afterBuildTicks()","total_count":1,"children":[]},{"name":".afterCalculateLabelRotation()","total_count":1,"children":[]},{"name":".afterDataLimits()","total_count":1,"children":[]},{"name":".afterFit()","total_count":1,"children":[]},{"name":".afterSetDimensions()","total_count":1,"children":[]},{"name":".afterTickToLabelConversion()","total_count":1,"children":[]},{"name":".afterUpdate()","total_count":1,"children":[]},{"name":".alpha()","total_count":1,"children":[]},{"name":".apply()","total_count":1,"children":[]},{"name":".applyStack()","total_count":1,"children":[]},{"name":".aspectRatio()","total_count":1,"children":[]},{"name":".beforeBuildTicks()","total_count":1,"children":[]},{"name":".beforeCalculateLabelRotation()","total_count":1,"children":[]},{"name":".beforeDataLimits()","total_count":1,"children":[]},{"name":".beforeFit()","total_count":1,"children":[]},{"name":".beforeLayout()","total_count":1,"children":[]},{"name":".beforeLayout()","total_count":1,"children":[]},{"name":".beforeSetDimensions()","total_count":1,"children":[]},{"name":".beforeTickToLabelConversion()","total_count":1,"children":[]},{"name":".beforeUpdate()","total_count":1,"children":[]},{"name":".bindEvents()","total_count":1,"children":[]},{"name":".bindResponsiveEvents()","total_count":1,"children":[]},{"name":".bindUserEvents()","total_count":1,"children":[]},{"name":".buildLabels()","total_count":1,"children":[]},{"name":".buildOrUpdateControllers()","total_count":1,"children":[]},{"name":".buildOrUpdateElements()","total_count":1,"children":[]},{"name":".buildOrUpdateScales()","total_count":1,"children":[]},{"name":".buildTicks()","total_count":1,"children":[]},{"name":".buildTicks()","total_count":1,"children":[]},{"name":".buildTicks()","total_count":1,"children":[]},{"name":".buildTicks()","total_count":1,"children":[]},{"name":".calculateCircumference()","total_count":1,"children":[]},{"name":".calculateLabelRotation()","total_count":1,"children":[]},{"name":".calculateTotal()","total_count":1,"children":[]},{"name":".cancel()","total_count":1,"children":[]},{"name":".chartOptionScopes()","total_count":1,"children":[]},{"name":".clear()","total_count":1,"children":[]},{"name":".clearCache()","total_count":1,"children":[]},{"name":".clearer()","total_count":1,"children":[]},{"name":".clone()","total_count":1,"children":[]},{"name":".computeTickLimit()","total_count":1,"children":[]},{"name":".computeTickLimit()","total_count":1,"children":[]},{"name":".computeTickLimit()","total_count":1,"children":[]},{"name":".configure()","total_count":1,"children":[]},{"name":".configure()","total_count":1,"children":[]},{"name":".configure()","total_count":1,"children":[]},{"name":".configure()","total_count":1,"children":[]},{"name":".configure()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".constructor()","total_count":1,"children":[]},{"name":".countVisibleElements()","total_count":1,"children":[]},{"name":".createResolver()","total_count":1,"children":[]},{"name":".darken()","total_count":1,"children":[]},{"name":".data()","total_count":1,"children":[]},{"name":".data()","total_count":1,"children":[]},{"name":".datasetAnimationScopeKeys()","total_count":1,"children":[]},{"name":".datasetElementScopeKeys()","total_count":1,"children":[]},{"name":".datasetScopeKeys()","total_count":1,"children":[]},{"name":".desaturate()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".destroy()","total_count":1,"children":[]},{"name":".determineDataLimits()","total_count":1,"children":[]},{"name":".determineDataLimits()","total_count":1,"children":[]},{"name":".determineDataLimits()","total_count":1,"children":[]},{"name":".determineDataLimits()","total_count":1,"children":[]},{"name":".determineDataLimits()","total_count":1,"children":[]},{"name":".diff()","total_count":1,"children":[]},{"name":".draw()","total_count":1,"children":[]},{"name":".draw()","total_count":1,"children":[]},{"name":".draw()","total_count":1,"children":[]},{"name":".draw()","total_count":1,"children":[]}]}]},{"name":"scratch","total_count":330,"children":[{"name":"check_active_persons.cjs","total_count":1,"children":[{"name":"http","total_count":1,"children":[]}]},{"name":"check_date_ranges.cjs","total_count":3,"children":[{"name":"checkDates()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"check_duplicates_in_excel.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"check_html_json.cjs","total_count":8,"children":[{"name":"content","total_count":1,"children":[]},{"name":"endIndex","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"htmlPath","total_count":1,"children":[]},{"name":"jsonText","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"rest","total_count":1,"children":[]},{"name":"startIndex","total_count":1,"children":[]}]},{"name":"check_other_supabase.cjs","total_count":4,"children":[{"name":"commonTables","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"check_prof_22.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"check_professionals_count.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"check_rehab_bugs.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"check_supabase_turnos.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"count_by_month.cjs","total_count":3,"children":[{"name":"countByMonth()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"delete_rehab_bugs.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"discover_supabase_tables.cjs","total_count":4,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"names","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"extract_js_from_html.cjs","total_count":6,"children":[{"name":"content","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"htmlPath","total_count":1,"children":[]},{"name":"inlineScripts","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"scriptTags","total_count":1,"children":[]}]},{"name":"extracted_script_1.js","total_count":5,"children":[{"name":"countFrequencies()","total_count":1,"children":[]},{"name":"generarInforme()","total_count":1,"children":[]},{"name":"getSortedTop()","total_count":1,"children":[]},{"name":"rawData","total_count":1,"children":[]},{"name":"updateDashboard()","total_count":1,"children":[]}]},{"name":"find_ftp_in_logs.cjs","total_count":3,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"readline","total_count":1,"children":[]}]},{"name":"find_instructions_in_logs.cjs","total_count":4,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"readline","total_count":1,"children":[]}]},{"name":"generate_migration_sql.js","total_count":6,"children":[{"name":"escapeSqlVal()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"outputFilePath","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"writeStream","total_count":1,"children":[]},{"name":"writeTableData()","total_count":1,"children":[]}]},{"name":"generate_obaid_report.cjs","total_count":5,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"get_github_logs.cjs","total_count":7,"children":[{"name":"fetchJobs()","total_count":1,"children":[]},{"name":"fetchLogs()","total_count":1,"children":[]},{"name":"fetchRawLogs()","total_count":1,"children":[]},{"name":"https","total_count":1,"children":[]},{"name":"options","total_count":1,"children":[]},{"name":"req","total_count":1,"children":[]},{"name":"url","total_count":1,"children":[]}]},{"name":"get_supabase_schema.cjs","total_count":1,"children":[{"name":"main()","total_count":1,"children":[]}]},{"name":"import_csv_demand.cjs","total_count":8,"children":[{"name":"calculateAgentsRequired()","total_count":1,"children":[]},{"name":"dotenv","total_count":1,"children":[]},{"name":"factorial()","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"importCsv()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]}]},{"name":"inspect_all_pg.cjs","total_count":4,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"inspectAll()","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]}]},{"name":"inspect_appointments_raw.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"inspect_columns.cjs","total_count":6,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"inspectColumns()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_current_schema.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"inspect_db.cjs","total_count":4,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"inspect()","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]}]},{"name":"inspect_demand_aggregation.cjs","total_count":6,"children":[{"name":"aggregateDemand()","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_excel.cjs","total_count":5,"children":[{"name":"downloadAndInspect()","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_excel_data.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"inspectData()","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_excel_min_max.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_ftp_sheets.cjs","total_count":6,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"inspect()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_metadata_tables.cjs","total_count":3,"children":[{"name":"inspectMetadata()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"inspect_neon_demand.cjs","total_count":4,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"{ Client }","total_count":1,"children":[]}]},{"name":"inspect_planificacion_sheets.cjs","total_count":6,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"inspect_rpcs.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"inspect_schema.js","total_count":3,"children":[{"name":"run()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"tables","total_count":1,"children":[]}]},{"name":"inspect_sync_lines.js","total_count":2,"children":[{"name":"content","total_count":1,"children":[]},{"name":"lines","total_count":1,"children":[]}]},{"name":"inspect_upload_logic.js","total_count":2,"children":[{"name":"content","total_count":1,"children":[]},{"name":"lines","total_count":1,"children":[]}]},{"name":"inspect_view.js","total_count":2,"children":[{"name":"run()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]}]},{"name":"inspect_view_data.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"inspect_view_data_anon.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"list_cirugias.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_ftp_files.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_ftp_files_secure.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_ftp_root.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_neon_tables.cjs","total_count":4,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"{ Client }","total_count":1,"children":[]}]},{"name":"list_other_dirs.cjs","total_count":4,"children":[{"name":"dirs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_stage_dir.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_teo_dir.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"list_turnera_040626.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"listFiles()","total_count":1,"children":[]}]},{"name":"migrate_initial_patient_appointments.cjs","total_count":9,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"migrate_neon_to_supabase.cjs","total_count":7,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"migrate_pg_to_ftp.cjs","total_count":8,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]},{"name":"runMigration()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"migrate_pg_to_planificacion.cjs","total_count":8,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]},{"name":"runMigration()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"print_first_prompts.cjs","total_count":3,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"readline","total_count":1,"children":[]}]},{"name":"probe_supabase_http.cjs","total_count":1,"children":[{"name":"https","total_count":1,"children":[]}]},{"name":"probe_supabase_tables.cjs","total_count":4,"children":[{"name":"commonTables","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"query_obaid_today.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"query_prefixes.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"query_turnera_coberturas.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"query_turnera_profesionales.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"query_turnos_web.cjs","total_count":3,"children":[{"name":"main()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"read_interno_app.cjs","total_count":5,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]}]},{"name":"read_interno_supabase.cjs","total_count":5,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]}]},{"name":"run_migration_chunks.cjs","total_count":3,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]}]},{"name":"search_code.js","total_count":1,"children":[{"name":"searchDir()","total_count":1,"children":[]}]},{"name":"search_other_conversation.cjs","total_count":4,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"readline","total_count":1,"children":[]}]},{"name":"search_sincronizar.js","total_count":2,"children":[{"name":"content","total_count":1,"children":[]},{"name":"lines","total_count":1,"children":[]}]},{"name":"split_sql.cjs","total_count":4,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"readline","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]}]},{"name":"split_sql_correctly.cjs","total_count":3,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]}]},{"name":"test_api_locally.cjs","total_count":2,"children":[{"name":"http","total_count":1,"children":[]},{"name":"start","total_count":1,"children":[]}]},{"name":"test_ftp.cjs","total_count":3,"children":[{"name":"ftp","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"testConnection()","total_count":1,"children":[]}]},{"name":"test_ftp_understanding.cjs","total_count":7,"children":[{"name":"fs","total_count":1,"children":[]},{"name":"ftp","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTime()","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"run()","total_count":1,"children":[]},{"name":"XLSX","total_count":1,"children":[]}]},{"name":"test_january_demand.cjs","total_count":2,"children":[{"name":"http","total_count":1,"children":[]},{"name":"start","total_count":1,"children":[]}]},{"name":"test_local_aggregation.cjs","total_count":3,"children":[{"name":"supabase","total_count":1,"children":[]},{"name":"test()","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"test_profs_access.cjs","total_count":3,"children":[{"name":"run()","total_count":1,"children":[]},{"name":"test()","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"test_raw_rest.cjs","total_count":3,"children":[{"name":"https","total_count":1,"children":[]},{"name":"options","total_count":1,"children":[]},{"name":"req","total_count":1,"children":[]}]},{"name":"test_raw_view.cjs","total_count":3,"children":[{"name":"supabase","total_count":1,"children":[]},{"name":"test()","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"test_save_ftp.cjs","total_count":4,"children":[{"name":"get()","total_count":1,"children":[]},{"name":"http","total_count":1,"children":[]},{"name":"post()","total_count":1,"children":[]},{"name":"testSave()","total_count":1,"children":[]}]},{"name":"test_summary_api.cjs","total_count":3,"children":[{"name":"http","total_count":1,"children":[]},{"name":"start","total_count":1,"children":[]},{"name":"tryFetch()","total_count":1,"children":[]}]},{"name":"test_supabase_connection.cjs","total_count":3,"children":[{"name":"run()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]},{"name":"{ createClient }","total_count":1,"children":[]}]},{"name":"test_sync_route.cjs","total_count":3,"children":[{"name":"http","total_count":1,"children":[]},{"name":"req","total_count":1,"children":[]},{"name":"start","total_count":1,"children":[]}]}]},{"name":"scripts","total_count":15,"children":[{"name":"dev.js","total_count":5,"children":[{"name":"__dirname","total_count":1,"children":[]},{"name":"backend","total_count":1,"children":[]},{"name":"cleanup()","total_count":1,"children":[]},{"name":"frontend","total_count":1,"children":[]},{"name":"root","total_count":1,"children":[]}]},{"name":"migrate-to-neon.ts","total_count":4,"children":[{"name":"__dirname","total_count":1,"children":[]},{"name":"__filename","total_count":1,"children":[]},{"name":"DB_FILE","total_count":1,"children":[]},{"name":"migrate()","total_count":1,"children":[]}]},{"name":"sync-ftp.js","total_count":6,"children":[{"name":"__dirname","total_count":1,"children":[]},{"name":"__filename","total_count":1,"children":[]},{"name":"FTP_CONFIG","total_count":1,"children":[]},{"name":"parseExcelDateTimeForUpsert()","total_count":1,"children":[]},{"name":"runSync()","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]}]}]},{"name":"src","total_count":75,"children":[{"name":"api.ts","total_count":3,"children":[{"name":"DatabaseSchema","total_count":1,"children":[]},{"name":"fetchDb()","total_count":1,"children":[]},{"name":"saveDb()","total_count":1,"children":[]}]},{"name":"App.tsx","total_count":1,"children":[{"name":"App()","total_count":1,"children":[]}]},{"name":"components","total_count":41,"children":[{"name":"AttendanceTrackerModal.tsx","total_count":2,"children":[{"name":"AttendanceTrackerModal()","total_count":1,"children":[]},{"name":"Props","total_count":1,"children":[]}]},{"name":"CoverageChart.tsx","total_count":4,"children":[{"name":"calculateTheoreticalWaitTime()","total_count":1,"children":[]},{"name":"CoverageChart()","total_count":1,"children":[]},{"name":"CoverageChartProps","total_count":1,"children":[]},{"name":"factorial()","total_count":1,"children":[]}]},{"name":"DemandCalculatorModal.tsx","total_count":5,"children":[{"name":"calculateAgentsRequired()","total_count":1,"children":[]},{"name":"DemandCalculatorModal()","total_count":1,"children":[]},{"name":"factorial()","total_count":1,"children":[]},{"name":"formatHourRange()","total_count":1,"children":[]},{"name":"Props","total_count":1,"children":[]}]},{"name":"ExcelImporterModal.tsx","total_count":6,"children":[{"name":"ExcelImporterModal()","total_count":1,"children":[]},{"name":"ExcelImporterModalProps","total_count":1,"children":[]},{"name":"PARSED_AREAS_MAP","total_count":1,"children":[]},{"name":"PARSED_DAYS_MAP","total_count":1,"children":[]},{"name":"ParsedTemplateRow","total_count":1,"children":[]},{"name":"PRESYLED_COLORS","total_count":1,"children":[]}]},{"name":"PeopleSidebar.tsx","total_count":2,"children":[{"name":"PeopleSidebar()","total_count":1,"children":[]},{"name":"PeopleSidebarProps","total_count":1,"children":[]}]},{"name":"PersonEditorModal.tsx","total_count":3,"children":[{"name":"PersonEditorModal()","total_count":1,"children":[]},{"name":"PersonEditorModalProps","total_count":1,"children":[]},{"name":"PRESTYLED_COLORS","total_count":1,"children":[]}]},{"name":"ReportGenerator.tsx","total_count":4,"children":[{"name":"FALLBACK_PROFESSIONALS","total_count":1,"children":[]},{"name":"ReportGenerator()","total_count":1,"children":[]},{"name":"ReportGeneratorProps","total_count":1,"children":[]},{"name":"supabase","total_count":1,"children":[]}]},{"name":"ShiftEditorModal.tsx","total_count":4,"children":[{"name":"getWeekDatesForDate()","total_count":1,"children":[]},{"name":"MonthWeek","total_count":1,"children":[]},{"name":"ShiftEditorModal()","total_count":1,"children":[]},{"name":"ShiftEditorModalProps","total_count":1,"children":[]}]},{"name":"StaffManagement.tsx","total_count":2,"children":[{"name":"StaffManagement()","total_count":1,"children":[]},{"name":"StaffManagementProps","total_count":1,"children":[]}]},{"name":"SyncLogsModal.tsx","total_count":3,"children":[{"name":"SyncLog","total_count":1,"children":[]},{"name":"SyncLogsModal()","total_count":1,"children":[]},{"name":"SyncLogsModalProps","total_count":1,"children":[]}]},{"name":"ThemeSelector.tsx","total_count":2,"children":[{"name":"ThemeSelector()","total_count":1,"children":[]},{"name":"ThemeSelectorProps","total_count":1,"children":[]}]},{"name":"ThemeSelectorPopover.tsx","total_count":2,"children":[{"name":"ThemeSelectorPopover()","total_count":1,"children":[]},{"name":"ThemeSelectorPopoverProps","total_count":1,"children":[]}]},{"name":"TimelineGrid.tsx","total_count":2,"children":[{"name":"TimelineGrid()","total_count":1,"children":[]},{"name":"TimelineGridProps","total_count":1,"children":[]}]}]},{"name":"feriados.ts","total_count":2,"children":[{"name":"Feriado","total_count":1,"children":[]},{"name":"FERIADOS_2026","total_count":1,"children":[]}]},{"name":"seedData.ts","total_count":6,"children":[{"name":"AREAS","total_count":1,"children":[]},{"name":"COLOR_PALETTES","total_count":1,"children":[]},{"name":"DAYS_OF_WEEK","total_count":1,"children":[]},{"name":"DEFAULT_TARGETS","total_count":1,"children":[]},{"name":"INITIAL_SHIFTS","total_count":1,"children":[]},{"name":"SEEDED_PERSONS","total_count":1,"children":[]}]},{"name":"supabase.ts","total_count":1,"children":[{"name":"supabase","total_count":1,"children":[]}]},{"name":"themes.ts","total_count":3,"children":[{"name":"AppTheme","total_count":1,"children":[]},{"name":"AreaStyle","total_count":1,"children":[]},{"name":"THEMES","total_count":1,"children":[]}]},{"name":"types.ts","total_count":7,"children":[{"name":"Area","total_count":1,"children":[]},{"name":"AttendanceRecord","total_count":1,"children":[]},{"name":"AttendanceStatus","total_count":1,"children":[]},{"name":"DemandRecord","total_count":1,"children":[]},{"name":"Person","total_count":1,"children":[]},{"name":"Shift","total_count":1,"children":[]},{"name":"TargetCoverage","total_count":1,"children":[]}]},{"name":"utils.ts","total_count":10,"children":[{"name":"calculateCoverage()","total_count":1,"children":[]},{"name":"CalendarDay","total_count":1,"children":[]},{"name":"checkOverlap()","total_count":1,"children":[]},{"name":"formatHour()","total_count":1,"children":[]},{"name":"generateMonthDays()","total_count":1,"children":[]},{"name":"getDayOfWeekFromDate()","total_count":1,"children":[]},{"name":"getHourRange()","total_count":1,"children":[]},{"name":"getInitials()","total_count":1,"children":[]},{"name":"getOverlappingShift()","total_count":1,"children":[]},{"name":"parseHour()","total_count":1,"children":[]}]},{"name":"main.tsx","total_count":1,"children":[]}]},{"name":"start.cjs","total_count":2,"children":[{"name":"devProcess","total_count":1,"children":[]},{"name":"{ spawn }","total_count":1,"children":[]}]},{"name":"test_db.cjs","total_count":4,"children":[{"name":"dotenv","total_count":1,"children":[]},{"name":"path","total_count":1,"children":[]},{"name":"pg","total_count":1,"children":[]},{"name":"pool","total_count":1,"children":[]}]},{"name":"tsconfig.json","total_count":18,"children":[{"name":"allowImportingTsExtensions","total_count":1,"children":[]},{"name":"allowJs","total_count":1,"children":[]},{"name":"compilerOptions","total_count":1,"children":[]},{"name":"DOM","total_count":1,"children":[]},{"name":"DOM.Iterable","total_count":1,"children":[]},{"name":"ES2022","total_count":1,"children":[]},{"name":"experimentalDecorators","total_count":1,"children":[]},{"name":"isolatedModules","total_count":1,"children":[]},{"name":"jsx","total_count":1,"children":[]},{"name":"lib","total_count":1,"children":[]},{"name":"module","total_count":1,"children":[]},{"name":"moduleDetection","total_count":1,"children":[]},{"name":"moduleResolution","total_count":1,"children":[]},{"name":"noEmit","total_count":1,"children":[]},{"name":"paths","total_count":1,"children":[]},{"name":"skipLibCheck","total_count":1,"children":[]},{"name":"target","total_count":1,"children":[]},{"name":"useDefineForClassFields","total_count":1,"children":[]}]},{"name":"vite.config.ts","total_count":1,"children":[]}]};
+
+    function transformData(jsonData) {
+        // Helper function to recursively build the children structure
+        function processNode(node, parentL1StageName) {
+            let displayName = node.name;
+            // Append total_count if it exists and is not already in the name
+            if (node.total_count !== undefined) {
+                if (!/\(Total Count: \d+\)$/.test(displayName)) {
+                    displayName += ` (Total Count: ${node.total_count})`;
+                }
+            }
+
+            const newNode = { name: displayName };
+
+            if (parentL1StageName === "Root") {
+                 newNode.originalStageName = node.name;
+            } else {
+                newNode.originalStageName = parentL1StageName;
+            }
+
+            if (node.children && node.children.length > 0) {
+                const stageNameToPass = (parentL1StageName === "Root") ? node.name : parentL1StageName;
+                newNode.children = node.children.map(child => processNode(child, stageNameToPass));
+            }
+
+            return newNode;
+        }
+
+        let rootDisplayName = jsonData.name;
+        if (jsonData.total_count !== undefined && !/\(Total Count: \d+\)$/.test(rootDisplayName)) {
+            rootDisplayName += ` (Total Count: ${jsonData.total_count})`;
+        }
+
+        return {
+            name: rootDisplayName,
+            originalStageName: "Root",
+            children: (jsonData.children || []).map(child => processNode(child, "Root"))
+        };
+    }
+
+    const treeData = transformData(initialJsonData);
+
+    // Auto-populated phaseColors: every depth-1 child of the root gets
+    // a stable colour from a bigger palette so all top-level dirs are
+    // distinguishable.
+    const PALETTE = [
+      ["#3498DB","#2980B9","#AED6F1"], ["#2ECC71","#27AE60","#A9DFBF"],
+      ["#E74C3C","#C0392B","#F5B7B1"], ["#9B59B6","#8E44AD","#D7BDE2"],
+      ["#F39C12","#D68910","#FAD7A0"], ["#1ABC9C","#117864","#A2D9CE"],
+      ["#34495E","#1B2631","#ABB2B9"], ["#E67E22","#BA4A00","#F5CBA7"],
+      ["#16A085","#0E6655","#A2D9CE"], ["#D35400","#A04000","#EDBB99"],
+      ["#7F8C8D","#566573","#D5DBDB"], ["#C0392B","#7B241C","#F5B7B1"],
+      ["#2E86C1","#1B4F72","#A9CCE3"], ["#28B463","#196F3D","#A9DFBF"],
+      ["#AF7AC5","#6C3483","#D2B4DE"],
+    ];
+    const phaseColors = { "Root": { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+                          "Default": { fill: "#BDC3C7", stroke: "#95A5A6", collapsedFill: "#ECF0F1" } };
+    (initialJsonData.children || []).forEach((c, i) => {
+      const pal = PALETTE[i % PALETTE.length];
+      phaseColors[c.name] = { fill: pal[0], stroke: pal[1], collapsedFill: pal[2] };
+    });
+
+    const levelSpecificPalettes = {
+      0: { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+      2: { fill: "#6ab04c", stroke: "#508a38", collapsedFill: "#a3d391" },
+      3: { fill: "#f0932b", stroke: "#d0730f", collapsedFill: "#f6c07e" },
+      4: { fill: "#be2edd", stroke: "#a01cb3", collapsedFill: "#e08bf2" },
+      5: { fill: "#00a8ff", stroke: "#007ac1", collapsedFill: "#74d2ff" },
+      6: { fill: "#e55039", stroke: "#c23620", collapsedFill: "#f09a8d" },
+      default: { fill: "#747d8c", stroke: "#57606f", collapsedFill: "#a4b0be" }
+    };
+
+    const svgElement = d3.select("#tree-svg");
+    const initialSvgWidth = +svgElement.attr("width");
+    const initialSvgHeight = +svgElement.attr("height");
+    const margin = { top: 40, right: 120, bottom: 80, left: 450 };
+    let width = initialSvgWidth - margin.left - margin.right;
+    let height = initialSvgHeight - margin.top - margin.bottom;
+    const duration = 500;
+    let nodeCounter = 0;
+    const g = svgElement.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const treemap = d3.tree().nodeSize([40, 0]);
+    let rootNode = d3.hierarchy(treeData, d => d.children);
+    rootNode.x0 = 0;
+    rootNode.y0 = 0;
+
+    if (rootNode.children) {
+      rootNode.children.forEach(d_child => {
+        if (d_child.children) { collapseBranch(d_child); }
+      });
+    }
+    updateTree(rootNode);
+
+    function collapseBranch(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseBranch); d.children = null; } }
+    function expandBranch(d) { if (d._children) { d.children = d._children; d._children = null; } if (d.children) { d.children.forEach(expandBranch); } }
+    window.expandAll = () => { expandBranch(rootNode); updateTree(rootNode); };
+    window.collapseAll = () => { if (rootNode.children) { rootNode.children.forEach(collapseBranch); } updateTree(rootNode); };
+    window.resetView = () => { if (rootNode.children) { rootNode.children.forEach(d_child => { if (d_child.children || d_child._children) { collapseBranch(d_child); } }); } if (rootNode._children && !rootNode.children) { rootNode.children = rootNode._children; rootNode._children = null; } updateTree(rootNode); };
+
+    function updateTree(source) {
+      const treeLayoutData = treemap(rootNode);
+      let nodes = treeLayoutData.descendants();
+      let links = treeLayoutData.descendants().slice(1);
+
+      let minX = 0;
+      let maxX = 0;
+      if (nodes.length > 0) {
+        minX = d3.min(nodes, d => d.x);
+        maxX = d3.max(nodes, d => d.x);
+      }
+
+      let neededHeight = Math.max(initialSvgHeight, maxX - minX + margin.top + margin.bottom + 100);
+      svgElement.transition().duration(duration / 2).attr("height", neededHeight);
+      g.transition().duration(duration / 2).attr("transform", `translate(${margin.left},${margin.top - minX + 40})`);
+
+      nodes.forEach(d => { d.y = d.depth * 400; }); // Adjust horizontal separation if needed
+
+      const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++nodeCounter));
+      const nodeEnter = node.enter().append('g')
+        .attr('class', d => "node" + (d.children || d._children ? " node--internal" : " node--leaf") + (d._children ? " _children" : ""))
+        .attr('transform', d => `translate(${source.y0},${source.x0})`)
+        .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else if (d._children) { d.children = d._children; d._children = null; } updateTree(d); })
+        .style('cursor', d => (d.children || d._children) ? 'pointer' : 'default');
+
+      nodeEnter.append('circle').attr('r', 1e-6);
+
+      nodeEnter.append('text')
+        .attr('dy', '.35em')
+        .attr('x', d => d.children || d._children ? -14 : 14)
+        .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+        .style("fill-opacity", 1e-6)
+        .call(wrapText, 380);
+
+      const nodeUpdate = nodeEnter.merge(node);
+      nodeUpdate.transition().duration(duration)
+        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('class', d => "node" + (d.children ? " node--internal" : " node--leaf") + (d._children ? " node--internal _children" : ""));
+
+      nodeUpdate.select('circle').attr('r', 8.5)
+        .style('fill', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            if (d._children) return palette.collapsedFill;
+            if (d.children) return palette.fill;
+            return "#fff";
+        })
+        .style('stroke', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            return palette.stroke;
+        });
+      nodeUpdate.select('text').style("fill-opacity", 1).call(wrapText, 380);
+
+      const nodeExit = node.exit().transition().duration(duration).attr('transform', d => `translate(${source.y},${source.x})`).remove();
+      nodeExit.select('circle').attr('r', 1e-6);
+      nodeExit.select('text').style('fill-opacity', 1e-6);
+
+      const link = g.selectAll('path.link').data(links, d => d.id);
+      const linkEnter = link.enter().insert('path', "g").attr('class', 'link').attr('d', d => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); });
+
+      linkEnter.merge(link).transition().duration(duration).attr('d', d => diagonal(d, d.parent))
+        .style('stroke', d => {
+            const sourceNode = d.parent;
+            if (!sourceNode) return phaseColors.Default.stroke;
+            const l1AncestorName = sourceNode.data.originalStageName;
+            const colorPalette = phaseColors[l1AncestorName] || phaseColors.Default;
+            return colorPalette.stroke;
+        });
+      link.exit().transition().duration(duration).attr('d', d => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+      nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+
+    function wrapText(textElements, maxWidth) {
+        const textPartColors = {
+            name: '#343a40',
+            count: '#0056b3'
+        };
+        const countRegex = /(\s\(Total Count: \d+\))$/;
+
+        textElements.each(function () {
+            const textD3 = d3.select(this);
+            const originalNodeText = textD3.datum().data.name;
+            const x = parseFloat(textD3.attr("x") || 0);
+            const initialDy = textD3.attr("dy");
+            const textAnchor = textD3.attr("text-anchor");
+            const lineHeight = 1.1;
+
+            textD3.text(null);
+
+            let namePart = originalNodeText;
+            let countPartText = "";
+
+            const countMatch = originalNodeText.match(countRegex);
+            if (countMatch && originalNodeText.endsWith(countMatch[0])) {
+                namePart = originalNodeText.substring(0, originalNodeText.length - countMatch[0].length).trim();
+                countPartText = countMatch[0].trim();
+            }
+
+            const tokens = [];
+            namePart.split(/\s+/).filter(Boolean).forEach(word => {
+                tokens.push({ text: word, type: 'name' });
+            });
+            if (countPartText) {
+                tokens.push({ text: countPartText, type: 'count' });
+            }
+
+            if (tokens.length === 0 && originalNodeText) {
+                tokens.push({ text: originalNodeText, type: 'name' });
+            }
+
+            let currentTspan = textD3.append("tspan").attr("x", x).attr("dy", initialDy);
+            if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+
+            let lineTokens = [];
+
+            for (let i = 0; i < tokens.length; i++) {
+                const tokenObj = tokens[i];
+
+                lineTokens.push(tokenObj);
+                currentTspan.text(lineTokens.map(t => t.text).join(" "));
+
+                if (currentTspan.node().getComputedTextLength() > maxWidth && lineTokens.length > 1) {
+                    lineTokens.pop();
+
+                    currentTspan.text(null);
+                    lineTokens.forEach((prevToken, idx) => {
+                        currentTspan.append("tspan")
+                            .text((idx > 0 ? " " : "") + prevToken.text)
+                            .style("fill", textPartColors[prevToken.type] || textPartColors.name)
+                            .style("font-weight", prevToken.type === 'count' ? "bold" : "normal");
+                    });
+
+                    lineTokens = [tokenObj];
+                    currentTspan = textD3.append("tspan").attr("x", x).attr("dy", lineHeight + "em");
+                    if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+                }
+            }
+
+            currentTspan.text(null);
+            lineTokens.forEach((token, idx) => {
+                currentTspan.append("tspan")
+                    .text((idx > 0 ? " " : "") + token.text)
+                    .style("fill", textPartColors[token.type] || textPartColors.name)
+                    .style("font-weight", token.type === 'count' ? "bold" : "normal");
+            });
+
+            if (textD3.selectAll("tspan > tspan").empty() && textD3.select("tspan").text().length === 0 && originalNodeText) {
+                let t = textD3.select("tspan");
+                let displayText = originalNodeText;
+                t.text(displayText).style("fill", textPartColors.name);
+                if (t.node() && t.node().getComputedTextLength() > maxWidth && displayText.length > 20) {
+                    let estimatedChars = Math.floor(maxWidth / (t.node().getComputedTextLength()/displayText.length) );
+                    displayText = displayText.substring(0, Math.max(0, estimatedChars - 3)) + "...";
+                    t.text(displayText);
+                }
+            }
+        });
+    }
+  </script>
+</body>
+</html>

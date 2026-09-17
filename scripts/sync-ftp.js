@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,9 +26,11 @@ const FTP_CONFIG = {
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IndiZ3V3bWJ3dXR2aHFzaXJ0anBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5Nzg1OTYsImV4cCI6MjA4MzU1NDU5Nn0.tiqGxp4BxqoI7P_jasfZORWjIyvqCbIcwvk9Elmzoa8';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 
 function parseExcelDateTimeForUpsert(serial) {
   const utc_days = Math.floor(serial - 25569);
@@ -44,7 +47,10 @@ function parseExcelDateTimeForUpsert(serial) {
   const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(dateObj.getUTCDate()).padStart(2, '0');
   
-  return `${yyyy}-${mm}-${dd} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return {
+    timestamp: `${yyyy}-${mm}-${dd} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+    hour: hours
+  };
 }
 
 async function runSync() {
@@ -58,6 +64,41 @@ async function runSync() {
     console.log("Downloading Turnos.xlsx...");
     await client.downloadTo(localExcelPath, "Turnos.xlsx");
     
+    // Fetch rehabilitation professionals to filter out bug appointments
+    console.log("Fetching rehabilitation professionals list for filtering...");
+    const { data: rehabProfs, error: rehabErr } = await supabase
+      .from('turnera_profesionales')
+      .select('profesional')
+      .eq('tipo_consulta', 'REHABILITACION');
+    
+    if (rehabErr) throw rehabErr;
+    const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
+    console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
+
+    const rehabProfsList = (rehabProfs || []).map(p => String(p.profesional).trim());
+    if (rehabProfsList.length > 0) {
+      const today = new Date();
+      const startRange = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const startRangeStr = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
+      
+      const endRange = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      const endRangeStr = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}T23:59:59`;
+      
+      console.log(`Purging existing rehabilitation appointments in Supabase from ${startRangeStr} to ${endRangeStr} to remove canceled/ghost sessions...`);
+      const { error: purgeErr } = await supabase
+        .from('planning_patient_appointments')
+        .delete()
+        .in('profesional', rehabProfsList)
+        .gte('turno', startRangeStr)
+        .lte('turno', endRangeStr);
+        
+      if (purgeErr) {
+        console.error("Warning: could not purge old rehab appointments:", purgeErr.message);
+      } else {
+        console.log("✓ Purged old rehab appointments successfully.");
+      }
+    }
+
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
@@ -72,11 +113,21 @@ async function runSync() {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
         
-        const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
+        const parseResult = parseExcelDateTimeForUpsert(serial);
+        const hour = parseResult.hour;
+        const turnoTimestamp = parseResult.timestamp;
+        
+        const profName = r["Profesional"] ? String(r["Profesional"]).trim().toUpperCase() : "";
+        if ((hour < 7 || hour > 21) && rehabProfsSet.has(profName)) {
+          // Skip buggy/administrative rehabilitation appointments outside work hours (e.g. 22hs, 23hs, 00hs)
+          return;
+        }
+        
         const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;
         
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, {
+            id: crypto.randomUUID(),
             paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
             profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
             cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
@@ -95,7 +146,8 @@ async function runSync() {
       for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
         const batch = mappedRows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
-          .rpc('upsert_patient_appointments', { payload: batch });
+          .from('planning_patient_appointments')
+          .upsert(batch, { onConflict: 'paciente,profesional,turno' });
         if (error) {
           console.error(`Error uploading batch at index ${i}:`, error.message);
           throw error;

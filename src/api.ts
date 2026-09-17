@@ -1,5 +1,5 @@
 import { Person, Shift, TargetCoverage, Area, AttendanceRecord, DemandRecord } from './types';
-import { supabase } from './supabase';
+import { supabase, supabaseControl } from './supabase';
 
 interface DatabaseSchema {
   persons: Person[];
@@ -81,7 +81,7 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
       if (!demandMap[dateStr]) {
         demandMap[dateStr] = {
           dateString: dateStr,
-          area: '', // will be matched by date only in CoverageChart
+          area: 'Admision', // defaulted to Admision to match backend
           hourlyRequirements: Array(24).fill(0),
           hourlyArtPatients: Array(24).fill(0),
           hourlyOsPatients: Array(24).fill(0)
@@ -151,9 +151,47 @@ export const saveDb = async (data: Partial<DatabaseSchema>) => {
   try {
     console.log("Saving changes via Supabase RPC...", Object.keys(data));
     
-    // We send the data payload directly to our transactional save RPC function
-    const { error } = await supabase.rpc('save_planning_data', { payload: data });
+    // We send everything EXCEPT targets and demand to the RPC to avoid JSONB casting errors in postgres
+    const payloadForRpc = { ...data };
+    
+    const targetsToSave = payloadForRpc.targets;
+    delete payloadForRpc.targets;
+    
+    const demandToSave = payloadForRpc.demand;
+    delete payloadForRpc.demand;
+
+    const { error } = await supabase.rpc('save_planning_data', { payload: payloadForRpc });
     if (error) throw error;
+
+    // Save targets sequentially if provided
+    if (targetsToSave) {
+      console.log("Saving targets separately...");
+      await supabaseControl.from('planning_targets').delete().neq('area', 'dummy_delete_val_xyz');
+      if (targetsToSave.length > 0) {
+        const mappedTargets = targetsToSave.map(t => ({
+          area: t.area,
+          day_of_week: Number(t.dayOfWeek),
+          hourly_requirements: t.hourlyTargets || []
+        }));
+        const { error: targetErr } = await supabaseControl.from('planning_targets').insert(mappedTargets);
+        if (targetErr) throw targetErr;
+      }
+    }
+
+    // Save demand sequentially if provided
+    if (demandToSave) {
+      console.log("Saving demand separately...");
+      await supabaseControl.from('planning_demand').delete().neq('date_string', 'dummy_delete_val_xyz');
+      if (demandToSave.length > 0) {
+        const mappedDemand = demandToSave.map(d => ({
+          date_string: d.dateString,
+          area: d.area,
+          hourly_requirements: d.hourlyRequirements || []
+        }));
+        const { error: demandErr } = await supabaseControl.from('planning_demand').insert(mappedDemand);
+        if (demandErr) throw demandErr;
+      }
+    }
 
     console.log("✓ Saved successfully via Supabase RPC.");
   } catch (error) {

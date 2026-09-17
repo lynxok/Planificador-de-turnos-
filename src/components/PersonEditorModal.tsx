@@ -92,12 +92,26 @@ export function PersonEditorModal({
       return;
     }
 
-    setPossibleShifts([...possibleShifts, { startHour, duration }]);
+    const isFirst = possibleShifts.length === 0;
+    setPossibleShifts([...possibleShifts, { startHour, duration, isPrimary: isFirst }]);
     setTemplateError('');
   };
 
+  const handleSetPrimaryShift = (index: number) => {
+    const updated = possibleShifts.map((ps, i) => ({
+      ...ps,
+      isPrimary: i === index
+    }));
+    setPossibleShifts(updated);
+  };
+
   const handleRemoveShiftTemplate = (index: number) => {
-    setPossibleShifts(possibleShifts.filter((_, i) => i !== index));
+    const wasPrimary = possibleShifts[index]?.isPrimary;
+    const remaining = possibleShifts.filter((_, i) => i !== index);
+    if (wasPrimary && remaining.length > 0) {
+      remaining[0].isPrimary = true;
+    }
+    setPossibleShifts(remaining);
   };
 
   // Color circles mapping
@@ -278,25 +292,42 @@ export function PersonEditorModal({
                 Sin plantillas predeterminadas. Puedes añadir plantillas personalizadas abajo.
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {possibleShifts.map((ps, idx) => {
                   const endStr = formatHour(ps.startHour + ps.duration);
                   return (
                     <div
                       key={idx}
-                      className="px-2.5 py-1.5 bg-indigo-50/50 border border-indigo-150 text-indigo-700 text-xs rounded-lg font-semibold flex items-center gap-2 group/tag"
+                      className={`px-3 py-2 border rounded-xl font-semibold flex items-center gap-3 transition-all ${
+                        ps.isPrimary 
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-900 shadow-2xs ring-1 ring-indigo-200/50' 
+                          : 'bg-slate-50/50 border-slate-200 text-slate-700 hover:border-slate-350'
+                      }`}
                     >
-                      <Clock size={11} className="text-indigo-400" />
-                      <span>
-                        {formatHour(ps.startHour)} a {endStr} ({ps.duration} hrs)
-                      </span>
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="radio"
+                          name="primary_shift_template"
+                          checked={!!ps.isPrimary}
+                          onChange={() => handleSetPrimaryShift(idx)}
+                          className="accent-indigo-600 rounded-full w-3.5 h-3.5 shrink-0"
+                        />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-bold font-sans">
+                            {formatHour(ps.startHour)} a {endStr}
+                          </span>
+                          <span className={`text-[9px] font-bold ${ps.isPrimary ? 'text-indigo-600' : 'text-slate-500'}`}>
+                            {ps.duration} hrs {ps.isPrimary ? '⭐️ (Principal)' : ''}
+                          </span>
+                        </div>
+                      </label>
                       <button
                         type="button"
                         onClick={() => handleRemoveShiftTemplate(idx)}
-                        className="text-indigo-400 hover:text-rose-600 transition-colors p-0.5 rounded-full cursor-pointer hover:bg-white"
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-200/40 cursor-pointer ml-auto shrink-0"
                         title="Eliminar plantilla"
                       >
-                        <Trash2 size={10} />
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   );

@@ -6,6 +6,9 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+import { GoogleGenAI } from '@google/genai';
+import alasql from 'alasql';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,9 +27,11 @@ const FTP_CONFIG = {
 };
 const FTP_DIR = process.env.FTP_DIR || "/public_html/turnera-040626z";
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://fwsnaasfxfzacchsyijx.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c25hYXNmeGZ6YWNjaHN5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzkxMzksImV4cCI6MjA5MDExNTEzOX0.I9QYbMGbk53SnkfZW7ixICNW9xnUahaRxAKDPK9Vo90';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wbguwmbwutvhqsirtjps.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'control_de_horas' }
+});
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -45,6 +50,7 @@ let appointmentsCache: any[] = [];
 let professionalsCache: any[] = [];
 let coveragesCache: any[] = [];
 let appointmentsSummaryCache: any[] = [];
+let aiQueryCache: any[] = [];
 
 // Helper to convert Excel serial datetime to YYYY-MM-DD and integer hour (0-23)
 function parseExcelDateTime(serial: number) {
@@ -131,6 +137,39 @@ async function syncFromFtpInternal() {
     console.log("Downloading Turnos.xlsx...");
     await client.downloadTo(localExcelPath, "Turnos.xlsx");
     
+    // Fetch rehabilitation professionals to filter out bug appointments
+    console.log("Fetching rehabilitation professionals list for filtering...");
+    const { data: rehabProfs, error: rehabErr } = await supabase
+      .from('turnera_profesionales')
+      .select('profesional')
+      .eq('tipo_consulta', 'REHABILITACION');
+    
+    if (rehabErr) throw rehabErr;
+    const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
+    console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
+
+    {
+      const today = new Date();
+      const startRange = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const startRangeStr = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
+      
+      const endRange = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      const endRangeStr = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}T23:59:59`;
+      
+      console.log(`Purging ALL existing appointments in Supabase from ${startRangeStr} to ${endRangeStr} to remove canceled/ghost sessions...`);
+      const { error: purgeErr } = await supabase
+        .from('planning_patient_appointments')
+        .delete()
+        .gte('turno', startRangeStr)
+        .lte('turno', endRangeStr);
+        
+      if (purgeErr) {
+        console.error("Warning: could not purge old appointments:", purgeErr.message);
+      } else {
+        console.log("✓ Purged old appointments successfully.");
+      }
+    }
+
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
     
@@ -145,12 +184,24 @@ async function syncFromFtpInternal() {
       rows.forEach((r: any) => {
         const serial = r["Turno"];
         if (!serial || typeof serial !== 'number') return;
+
+        // Check for rehabilitation appointments bug (administrative rows outside work hours, e.g. 22hs, 23hs, 00hs)
+        const fractional_day = serial - Math.floor(serial);
+        const total_seconds = Math.round(fractional_day * 24 * 60 * 60);
+        const hours = Math.floor(total_seconds / 3600);
+
+        const profName = r["Profesional"] ? String(r["Profesional"]).trim().toUpperCase() : "";
+        if ((hours < 7 || hours > 21) && rehabProfsSet.has(profName)) {
+          // Skip this bug row
+          return;
+        }
         
         const turnoTimestamp = parseExcelDateTimeForUpsert(serial);
         const key = `${String(r["Paciente"]).trim().toUpperCase()}_${String(r["Profesional"]).trim().toUpperCase()}_${turnoTimestamp}`;
         
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, {
+            id: crypto.randomUUID(),
             paciente: r["Paciente"] ? String(r["Paciente"]).trim() : "",
             profesional: r["Profesional"] ? String(r["Profesional"]).trim() : "",
             cobertura: r["Cobertura"] ? String(r["Cobertura"]).trim() : "",
@@ -173,9 +224,44 @@ async function syncFromFtpInternal() {
           .from('planning_patient_appointments')
           .upsert(batch, { onConflict: 'paciente,profesional,turno' });
         if (error) {
-          console.error(`Error uploading batch at index ${i}:`, error.message);
+          console.error("Batch upsert error:", error);
           throw error;
         }
+      }
+
+      // Automatically register missing professionals
+      try {
+        console.log("Checking for new professionals to add to the master table...");
+        const { data: currentDocs, error: docsErr } = await supabase
+          .from('turnera_profesionales')
+          .select('id, profesional');
+          
+        if (!docsErr && currentDocs) {
+          const existingNames = new Set(currentDocs.map(d => String(d.profesional).trim().toUpperCase()));
+          let maxId = Math.max(...currentDocs.map(d => d.id || 0), 0);
+          
+          // Find unique professionals from mappedRows that aren't in existingNames
+          const allExcelProfs = new Set(mappedRows.map(r => r.profesional.toUpperCase()));
+          const newProfs: string[] = [];
+          allExcelProfs.forEach(p => {
+            if (p && !existingNames.has(p)) newProfs.push(p);
+          });
+          
+          if (newProfs.length > 0) {
+            console.log(`Found ${newProfs.length} new professionals. Registering them...`);
+            const insertData = newProfs.map((name, i) => ({ id: maxId + 1 + i, profesional: name }));
+            const { error: insertErr } = await supabase
+              .from('turnera_profesionales')
+              .insert(insertData);
+              
+            if (insertErr) console.error("Could not insert new professionals:", insertErr.message);
+            else console.log("New professionals registered successfully.");
+          } else {
+            console.log("No new professionals found.");
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync new professionals:", e);
       }
       console.log("Database upsert complete.");
     }
@@ -312,7 +398,7 @@ async function fetchAllFromSupabase() {
   while (true) {
     const { data: apptsData, error: apptsErr } = await supabase
       .from('planning_patient_appointments')
-      .select('profesional, cobertura, turno, asistio, atendido')
+      .select('paciente, nro_hc, profesional, cobertura, turno, asistio, atendido')
       .range(apptsPageIndex * apptsPageSize, (apptsPageIndex + 1) * apptsPageSize - 1);
     
     if (apptsErr) throw apptsErr;
@@ -322,6 +408,33 @@ async function fetchAllFromSupabase() {
     apptsPageIndex++;
   }
   appointmentsCache = allAppts;
+    aiQueryCache = allAppts.map(r => {
+      let fechaLimpia = "Fecha desconocida";
+      let horaLimpia = "00:00";
+      if (r.turno) {
+        const parts = r.turno.split('T');
+        if (parts[0]) {
+          const dateParts = parts[0].split('-');
+          if (dateParts.length === 3) {
+            fechaLimpia = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+          }
+        }
+        if (parts[1]) {
+          horaLimpia = parts[1].substring(0, 5);
+        }
+      }
+      return {
+        paciente: r.paciente,
+        nro_hc: r.nro_hc,
+        profesional: r.profesional,
+        cobertura: r.cobertura,
+        fecha: fechaLimpia,
+        hora: horaLimpia,
+        asistio: r.asistio ? 'Sí' : 'No',
+        atendido: r.atendido ? 'Sí' : 'No',
+        turno: r.turno
+      };
+    });
 
   // 10. Build the appointments summary cache for analysis
   console.log(`Processing ${allAppts.length} appointments for analysis dashboard...`);
@@ -515,6 +628,102 @@ app.post('/api/sync-demand', async (req, res) => {
   }
 });
 
+app.post('/api/bot-query', async (req, res) => {
+  try {
+    const { query, apiKey, history = [] } = req.body;
+    if (!query || !apiKey) return res.status(400).json({ error: 'Query y apiKey son obligatorios' });
+    
+    const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+    
+    let historyContext = '';
+    if (history && history.length > 0) {
+      historyContext = "\nHistorial de la conversación:\n" + history.map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Bot'}: ${m.content}`).join('\n') + "\n";
+    }
+    
+    const nombresMedicos = professionalsCache.map(p => p.profesional).join(', ');
+    const fechaHoyIso = new Date().toISOString().split('T')[0];
+    
+    const prompt = `Eres un asistente experto en SQL (AlaSQL / SQLite) y análisis de datos médicos.
+Tienes acceso de lectura a la tabla 'planning_patient_appointments'.
+La fecha de hoy es: ${fechaHoyIso}. Si el usuario pide datos de "hoy", "este mes", etc., utiliza esta fecha como referencia.
+El esquema EXACTO de la tabla es el siguiente:
+- paciente (text)
+- nro_hc (text, número de historia clínica)
+- profesional (text)
+- cobertura (text, obra social)
+- fecha (text, formato 'DD/MM/YYYY')
+- hora (text, formato 'HH:mm')
+- asistio (text, valores: 'Sí' o 'No')
+- atendido (text, valores: 'Sí' o 'No')
+- turno (text, formato ISO 'YYYY-MM-DDTHH:mm:ss.sssZ')
+
+Los médicos disponibles en la base de datos son: ${nombresMedicos}.
+
+Tu objetivo es responder a la petición del usuario de forma útil, amigable y profesional.
+Considera el historial de la conversación si el usuario hace referencia a algo dicho anteriormente o responde con una confirmación.
+
+IMPORTANTE: 
+1. Escribe un mensaje de respuesta (fuera de los bloques de código) explicando qué datos estás mostrando o confirmando la acción.
+2. Si la solicitud es clara, debes incluir UNA consulta SQL válida envuelta en bloques de código \`\`\`sql ... \`\`\`. 
+3. Si el usuario pide un reporte para un médico cuyo nombre está mal escrito, es un apodo, o es ambiguo, NO generes la consulta SQL. En su lugar, pregúntale amablemente: "¿Te refieres a [nombre exacto del médico]?" sugiriendo el nombre correcto de la lista de médicos disponibles.
+4. Solo puedes hacer SELECT. No uses UPDATE, DELETE ni INSERT.
+5. Si la pregunta pide agrupaciones, cantidades o dice la palabra "totalízalos", "cuántos", o "suma", debes usar COUNT, SUM y GROUP BY obligatoriamente para devolver los totales, en lugar de un listado fila por fila. Si te piden un listado Y totalizarlo, prioriza mostrar la tabla agrupada con los totales por cada ítem.
+6. El campo 'turno' es una cadena de texto (ISO). Si te piden filtrar por fechas, usa SIEMPRE el operador LIKE (ejemplo: turno LIKE '${fechaHoyIso.substring(0,7)}%'). NUNCA uses funciones como strftime() o EXTRACT() ya que no son compatibles con el motor.
+7. Si el usuario te pide un filtro por hora (ej. "de 10 a 12", "despues de las 14"), usa la función SUBSTRING(turno, 12, 2) para comparar la hora. Por ejemplo: CAST(SUBSTRING(turno, 12, 2) AS INT) >= 10 AND CAST(SUBSTRING(turno, 12, 2) AS INT) <= 12.
+${historyContext}
+Petición actual del usuario: "${query}"`;
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-flash-latest',
+      contents: prompt
+    });
+    
+    const text = response.text || '';
+    const sqlMatch = text.match(/```sql\s*([\s\S]*?)\s*```/);
+    const conversationalMessage = text.replace(/```sql\s*([\s\S]*?)\s*```/, '').trim();
+    
+    let rows: any[] | null = null;
+    
+    if (sqlMatch) {
+      const sql = sqlMatch[1].trim();
+      if (!sql.toLowerCase().startsWith('select')) {
+         return res.status(400).json({ error: 'El bot intentó ejecutar una consulta inválida (no es SELECT).' });
+      }
+      
+      // Execute raw query using in-memory alasql on the cached data
+      console.log("\n--- EJECUTANDO SQL ---\n" + sql + "\n-----------------------\n");
+      
+      try {
+        let executableSql = sql.replace(/planning_patient_appointments/gi, '?');
+        rows = alasql(executableSql, [aiQueryCache]);
+      } catch (sqlError: any) {
+        console.error("SQL Error in Bot Query:", sqlError.message);
+        return res.json({ 
+          success: false, 
+          message: "Lo siento, la consulta generada fue demasiado compleja o tuvo un error de sintaxis en el motor de base de datos local. Por favor, intentá reformular la pregunta más simple.", 
+          results: null,
+          error: true
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      results: rows,
+      message: conversationalMessage || 'Acá tenés los datos solicitados.'
+    });
+  } catch (err: any) {
+    console.error('Failed to process bot query:', err);
+    // Return a 200 with error=true so the UI can display it gracefully instead of breaking
+    return res.json({ 
+      success: false, 
+      message: "Hubo un error de conexión con la Inteligencia Artificial (probablemente Google Gemini está saturado o la consulta fue muy larga). Por favor, esperá unos segundos y volvé a intentar.", 
+      results: null,
+      error: true
+    });
+  }
+});
+
 app.get('/api/appointments-summary', (req, res) => {
   res.json(appointmentsSummaryCache);
 });
@@ -524,13 +733,25 @@ app.get('*', (req, res) => {
   res.sendFile(path.resolve(__dirname, '../dist/index.html'));
 });
 
-const PORT = 3021;
+const PORT = 1950;
 app.listen(PORT, async () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
   console.log("Initializing local cache from Supabase on startup...");
   try {
     await fetchAllFromSupabase();
     console.log("Startup cache sync complete.");
+    
+    // Auto-refresh the cache every 10 minutes in the background
+    setInterval(async () => {
+      console.log("Background cache refresh started...");
+      try {
+        await fetchAllFromSupabase();
+        console.log("Background cache refresh complete.");
+      } catch (err) {
+        console.error("Background cache refresh failed:", err);
+      }
+    }, 10 * 60 * 1000);
+    
   } catch (e) {
     console.error("Warning: Startup cache sync failed.", e);
   }

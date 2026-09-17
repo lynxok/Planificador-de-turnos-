@@ -271,6 +271,37 @@ export function ShiftEditorModal({
             </div>
           </div>
 
+          {/* Quick Absence Shortcuts */}
+          <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 flex items-center justify-between gap-2.5">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Ausencia Rápida:</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setArea('VACACIONES');
+                  setStartHourStr('00:00');
+                  setDuration(24);
+                }}
+                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-250 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                title="Marcar vacaciones por 24 horas"
+              >
+                🏝️ Vacaciones
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setArea('ENFERMEDAD');
+                  setStartHourStr('00:00');
+                  setDuration(24);
+                }}
+                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-250 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                title="Marcar enfermedad/licencia por 24 horas"
+              >
+                🤒 Enfermedad
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             {/* Start Hour */}
             <div>
