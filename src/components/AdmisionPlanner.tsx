@@ -17,7 +17,7 @@ interface AdmisionPlannerProps {
 
 export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts, onSave, areas, targets = [], demand = [] }: AdmisionPlannerProps) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'staff' | 'timeoff'>('calendar');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 7, 3)); // Aug 3 2026 is Monday
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   
   return (
     <div className={`h-full flex flex-col ${theme.timelineBg} ${theme.timelineHeaderText}`}>
@@ -39,21 +39,21 @@ export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts,
         <div className="flex gap-2">
           <button 
             onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : '${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity'}`}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : `${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity`}`}
           >
             <Calendar size={18} />
             Vista Semanal
           </button>
           <button 
             onClick={() => setActiveTab('staff')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'staff' ? 'bg-blue-600 text-white' : '${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity'}`}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'staff' ? 'bg-blue-600 text-white' : `${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity`}`}
           >
             <Users size={18} />
             Gestión de Personal
           </button>
           <button 
             onClick={() => setActiveTab('timeoff')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'timeoff' ? 'bg-blue-600 text-white' : '${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity'}`}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === 'timeoff' ? 'bg-blue-600 text-white' : `${theme.cardHeaderBg} opacity-70 hover:opacity-100 transition-opacity`}`}
           >
             <Briefcase size={18} />
             Licencias y Francos
@@ -153,7 +153,7 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
             <ChevronLeft size={16} />
           </button>
           <button 
-            onClick={() => setCurrentDate(new Date(2026, 7, 3))}
+            onClick={() => setCurrentDate(new Date())}
             className="px-4 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 transition-colors shadow-sm font-medium text-slate-700"
           >
             Hoy

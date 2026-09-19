@@ -8,3 +8,6 @@ coverage/
 !.env.example
 Versiones anteriores/
 *.xlsx
+test_db.js
+schema.json
+schema2.json

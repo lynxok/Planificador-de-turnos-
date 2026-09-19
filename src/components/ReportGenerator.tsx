@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabaseControl as supabase } from '../supabase';
-import { FileDown, CalendarDays, Search, Users, Activity, Filter, Trash2, Maximize2, Minimize2, CheckSquare, Square, TrendingUp, DollarSign, Clock, CheckCircle2, ChevronRight, Download, RefreshCw, X } from 'lucide-react';
+import { FileDown, CalendarDays, Calendar, FileSpreadsheet, Search, Users, Activity, Filter, Trash2, Maximize2, Minimize2, CheckSquare, Square, TrendingUp, DollarSign, Clock, CheckCircle2, ChevronRight, Download, RefreshCw, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { 
-  Calendar, 
-  FileSpreadsheet, 
-  Download, 
-  Search, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw,
-  Users
-} from 'lucide-react';
 
 interface ReportGeneratorProps {
   theme: any;
