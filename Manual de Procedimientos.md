@@ -182,5 +182,17 @@ Para satisfacer los requerimientos operativos de cobertura continua en la clíni
 * **Motor Dinámico de Temas**: La grilla, los encabezados y las pestañas se adaptan instantáneamente al tema visual seleccionado por el usuario.
 * **Auto-Upsert de Áreas Maestras**: El cliente de guardado (`src/api.ts`) garantiza que cualquier área utilizada (incluyendo `"Admisión General"` y `"Admisión ART"`) se registre automáticamente en la tabla `planning_areas` de Supabase antes de guardar los turnos, previniendo conflictos de integridad referencial (claves foráneas).
 
+### 7.5. Columna de Demanda Integrada (Esquema Islas / Dedicado)
+* **Visualización de Demanda por Hora**: Inmediatamente al lado de la columna de horarios, la grilla proyecta el requerimiento de dotación calculado matemáticamente mediante **Erlang C**:
+  * `[ ART: X ]` (Azul): Admisores dedicados para la atención de pacientes de ART en esa hora.
+  * `[ OS: Y ]` (Violeta): Admisores dedicados para la atención de pacientes de Obra Social y Particulares.
+  * `[ = Total ]` (Rojo): Total de dotación requerida bajo esquema de islas independientes.
+* **Selector Dinámico de Día (`[Dom | Lun | Mar | Mié | Jue | Vie | Sáb]`)**: Ubicado en la barra superior de la grilla, permite conmutar en un clic la proyección de demanda para visualizar cualquiera de los días de la semana activa.
+
+### 7.6. Asistente de Exportación e Impresión en PDF
+* **Botón `Exportar / Imprimir PDF`**: Ubicado en la cabecera del planificador, abre un asistente interactivo para generar documentos listos para impresión o guardado digital en PDF.
+* **Modalidad Fichas Individuales por Empleado**: Diseñado específicamente para entregar o enviar los horarios a cada colaborador. Contiene nombre, legajo, días asignados, horarios exactos, total de horas semanales y espacio para firma de conformidad. Permite filtrar por un colaborador puntual o exportar la totalidad del equipo con saltos de página automáticos (`page-break-after`).
+* **Modalidad Grilla Semanal Completa**: Genera la matriz apaisada de 24 horas y 7 días con códigos de colores, ideal para publicar en pizarras o carteleras de la clínica.
+
 ---
-*Última actualización: 22 de Septiembre, 2026 (Módulo Admisión 24/7, Cobertura en Grilla y Corrección de Claves Foráneas).*
+*Última actualización: 22 de Septiembre, 2026 (Módulo Admisión 24/7, Columna Demanda Erlang C, Exportación PDF y Sincronización Supabase).*
