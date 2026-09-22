@@ -157,13 +157,30 @@ El sistema integra un completo generador de reportes consolidado y dashboards es
 ### 6.3. Copias de Seguridad de Versiones (`Versiones anteriores`)
 Antes de cada compilación de distribución (`npm run build`) o cambios críticos, se realiza una copia de seguridad del directorio `dist/` a la carpeta `Versiones anteriores/` asignándole un nombre de versión descriptivo (ej. `dist_pre_primary_radio_indicator_2026_07_23`).
 
-### 6.4. Gestión de Repositorios (Git Multi-Remoto)
-El código fuente de este proyecto se gestiona de forma centralizada en dos repositorios remotos:
-1. **`origin`**: Repositorio principal de desarrollo (`https://github.com/AstudillaJS/Planificador-de-turnos.git`).
-2. **`lynxok`**: Repositorio de la organización/cuenta Lynx (`https://github.com/lynxok/Planificador-de-turnos-.git`).
+---
 
-Para empujar los cambios de la rama activa:
-```bash
-git push origin Reloj-de-horas-1
-git push lynxok Reloj-de-horas-1
-```
+## 7. Módulo de Planificación de Admisión 24/7 y Licencias
+
+Para satisfacer los requerimientos operativos de cobertura continua en la clínica, el sistema integra la vista especializada **`Planificación de Admisión 24/7`** (`src/components/AdmisionPlanner.tsx`):
+
+### 7.1. Grilla Semanal 24 Horas
+* **Cobertura Continua**: Presenta las 24 horas del día (desde las `00:00` a las `23:00` en bloques de 1 hora) para los 7 días de la semana.
+* **Diferenciación Visual por Franja Horaria**: Filas sutilmente coloreadas para distinguir horarios nocturnos (`00:00` a `06:00` y `22:00` a `24:00`), matutinos (`06:00` a `14:00`) y vespertinos (`14:00` a `22:00`).
+* **Indicadores de Cobertura en Tiempo Real (`Cubiertos / Requeridos`)**: Cada celda calcula dinámicamente el objetivo de dotación según el Gestor de Demanda y las metas configuradas. Si se alcanza o supera el requerimiento, la pastilla se ilumina en verde esmeralda (ej. `2/1`); si la dotación es insuficiente, se destaca en rojo.
+
+### 7.2. Asignación Rápida y Diferenciación de Turnos
+* **Modal de Asignación con Buscador**: Al presionar sobre una celda se abre el asistente de asignación, el cual incluye un buscador en tiempo real por nombre de colaborador, selectores de hora inicio/fin y selección de tipo de admisión:
+  * **Admisión General**: Bloques de turno en color azul (`bg-blue-600`).
+  * **Admisión ART**: Bloques de turno en color índigo (`bg-indigo-600`).
+* **Eliminación Intuitiva**: Cada turno asignado cuenta con un botón de cierre rápido `✕` para desasignar al colaborador en un solo clic.
+
+### 7.3. Registro de Licencias, Francos y Feriados
+* **Pestaña de Licencias**: Permite registrar ausencias justificadas (Vacaciones, Franco Compensatorio, Feriado No Laborable, Licencia Médica) indicando el empleado y rango de fechas.
+* **Impacto en Grilla**: Las licencias se reflejan automáticamente en la grilla horaria en color rojo (`bg-red-500`) para alertar al planificador y no contabilizar al colaborador como personal activo en la cobertura.
+
+### 7.4. Integración con Temas y Persistencia en Base de Datos
+* **Motor Dinámico de Temas**: La grilla, los encabezados y las pestañas se adaptan instantáneamente al tema visual seleccionado por el usuario.
+* **Auto-Upsert de Áreas Maestras**: El cliente de guardado (`src/api.ts`) garantiza que cualquier área utilizada (incluyendo `"Admisión General"` y `"Admisión ART"`) se registre automáticamente en la tabla `planning_areas` de Supabase antes de guardar los turnos, previniendo conflictos de integridad referencial (claves foráneas).
+
+---
+*Última actualización: 22 de Septiembre, 2026 (Módulo Admisión 24/7, Cobertura en Grilla y Corrección de Claves Foráneas).*

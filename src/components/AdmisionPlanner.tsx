@@ -119,6 +119,20 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
   const weekEnd = days[6];
   const weekStr = `${weekStart.getDate()}/${weekStart.getMonth()+1} al ${weekEnd.getDate()}/${weekEnd.getMonth()+1}`;
 
+  const getRequirementFor = (d: Date, hour: number): number => {
+    const dateStr = d.toISOString().split('T')[0];
+    const isAdmisionArea = (area: string) => ['Admisión General', 'Admision', 'General', 'Admisión ART', 'Admisión'].includes(area);
+
+    const specificDemand = (demand || []).find((dr: any) => dr.dateString === dateStr && isAdmisionArea(dr.area));
+    if (specificDemand && specificDemand.hourlyRequirements) return specificDemand.hourlyRequirements[hour] || 0;
+
+    const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
+    const dTarget = (targets || []).find((t: any) => t.dayOfWeek === dayOfWeek && isAdmisionArea(t.area));
+    if (dTarget && dTarget.hourlyTargets) return dTarget.hourlyTargets[hour] || 0;
+
+    return 0;
+  };
+
   const handleDeleteShift = (id: string) => {
     setShifts((prev: Shift[]) => prev.filter(s => s.id !== id));
   };
@@ -185,44 +199,36 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
             {Array.from({ length: 24 }).map((_, hour) => {
               const isNight = hour >= 22 || hour < 6;
               const isMorning = hour >= 6 && hour < 14;
-              
-              const rowClass = isNight ? 'bg-indigo-50/40' : isMorning ? 'bg-amber-50/30' : 'bg-orange-50/30';
-              
+
+              const rowClass = isNight ? 'bg-indigo-50' : isMorning ? 'bg-amber-50' : 'bg-orange-50';
+
               return (
-                <tr key={hour} className={`border-b border-slate-200 ${rowClass} hover:bg-slate-50 transition-colors`}>
-                  <td className="p-2 border-r border-slate-200 text-center align-middle font-bold font-mono text-slate-500">
-                    <div className="flex flex-col items-center justify-center h-full">
-                      <div>{hour.toString().padStart(2, '0')}:00 a {(hour+1).toString().padStart(2, '0')}:00</div>
-                      {(() => {
-                        const maxReq = days.reduce((max, d) => {
-                           const dateStr = d.toISOString().split('T')[0];
-                           const specificDemand = (demand || []).find((dr: any) => dr.dateString === dateStr && (dr.area === 'Admisión General' || dr.area === 'Admision' || dr.area === 'General' || dr.area === 'Admisión ART' || dr.area === 'Admisión'));
-                           if (specificDemand && specificDemand.hourlyRequirements) return Math.max(max, specificDemand.hourlyRequirements[hour] || 0);
-                           
-                           const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
-                           const dTarget = (targets || []).find((t: any) => t.dayOfWeek === dayOfWeek && (t.area === 'Admisión General' || t.area === 'Admision' || t.area === 'General' || t.area === 'Admisión ART' || t.area === 'Admisión'));
-                           if (dTarget && dTarget.hourlyTargets) return Math.max(max, dTarget.hourlyTargets[hour] || 0);
-                           return max;
-                        }, 0);
-                        return (
-                          <div className="mt-1.5 text-[10px] font-sans font-bold opacity-80 rounded px-1.5 py-0.5 inline-block border border-current shadow-sm" style={{ color: 'inherit' }}>
-                            Req: {maxReq}
-                          </div>
-                        );
-                      })()}
-                    </div>
+                <tr key={hour} className={`border-b border-slate-200 ${rowClass} hover:bg-slate-100/70 transition-colors`}>
+                  <td className="p-2 border-r border-slate-200 text-center align-middle font-bold font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                    {hour.toString().padStart(2, '0')}:00 - {(hour+1).toString().padStart(2, '0')}:00
                   </td>
                   {days.map((d: Date, i: number) => {
                     const dateStr = d.toISOString().split('T')[0];
-                    
+
                     const workingHere = shifts.filter((s: Shift) => {
                       if (s.date !== dateStr) return false;
                       const sEnd = s.startHour + s.duration;
                       return hour >= s.startHour && hour < sEnd;
                     });
-                    
+
+                    const req = getRequirementFor(d, hour);
+                    const covered = workingHere.filter((s: Shift) => !['VACACIONES', 'FRANCO', 'ENFERMEDAD', 'FERIADO'].includes(s.area)).length;
+
                     return (
                       <td key={i} className="p-1.5 border-r border-slate-200 align-top relative min-h-[55px] group">
+                        {req > 0 && (
+                          <div
+                            className={`absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border shadow-sm z-[1] ${covered >= req ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-red-100 text-red-700 border-red-300'}`}
+                            title={`Cobertura: ${covered} de ${req} requeridos`}
+                          >
+                            {covered}/{req}
+                          </div>
+                        )}
                         <div className="flex flex-col gap-1.5 min-h-[48px]">
                           {workingHere.map((s: Shift) => {
                             const person = persons.find((p: Person) => p.id === s.personId);
@@ -230,16 +236,16 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
                             const isTimeOff = s.area === 'VACACIONES' || s.area === 'FRANCO' || s.area === 'ENFERMEDAD' || s.area === 'FERIADO';
                             const isArt = s.area === 'Admisión ART' || s.area === 'ART';
                             const bgColor = isTimeOff ? 'bg-red-500 text-white' : isArt ? 'bg-indigo-600 text-white' : 'bg-blue-600 text-white';
-                            
+
                             return (
-                              <div key={s.id} className={`text-xs p-1.5 rounded font-medium flex justify-between items-center shadow-sm ${bgColor}`}>
+                              <div key={s.id} className={`text-[13px] p-1.5 rounded font-medium flex justify-between items-center shadow-sm ${bgColor}`}>
                                 <span className="truncate drop-shadow-md" title={person.name}>{person.name}</span>
-                                <button onClick={() => handleDeleteShift(s.id)} className="opacity-60 hover:opacity-100 p-0.5 hover:bg-black hover:bg-opacity-20 rounded transition-all"><X size={12}/></button>
+                                <button onClick={() => handleDeleteShift(s.id)} className="opacity-60 hover:opacity-100 p-0.5 hover:bg-black hover:bg-opacity-20 rounded transition-all shrink-0"><X size={12}/></button>
                               </div>
                             );
                           })}
-                          <button 
-                            className="text-xs font-semibold opacity-0 group-hover:opacity-100 text-center py-1.5 transition-all w-full border border-dashed border-red-300 text-red-500 bg-red-50 hover:bg-red-100 hover:border-red-400 rounded shadow-sm"
+                          <button
+                            className="text-xs font-semibold opacity-35 group-hover:opacity-100 text-center py-1.5 transition-opacity w-full border border-dashed border-red-300 text-red-500 bg-red-50 hover:bg-red-100 hover:border-red-400 rounded shadow-sm"
                             title="Asignar alguien"
                             onClick={() => { setAssignModal({isOpen: true, dateStr, hour, endHour: (hour + 8) % 24, selectedPersons: new Set(), shiftArea: 'Admisión General'}); setSearchTerm(''); }}
                           >

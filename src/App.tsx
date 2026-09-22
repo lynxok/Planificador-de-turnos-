@@ -1707,8 +1707,8 @@ export default function App() {
             ) : viewMode === 'guardias' ? (
               <GuardiasCalculator theme={activeTheme} />
             ) : viewMode === 'admision' ? (
-              <div className="flex-1 w-full animate-fade-in h-full">
-                <AdmisionPlanner 
+              <div className="flex-1 w-full animate-fade-in h-[calc(100vh-140px)]">
+                <AdmisionPlanner
                   theme={activeTheme} 
                   persons={persons} 
                   setPersons={setPersons} 

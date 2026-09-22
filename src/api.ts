@@ -159,6 +159,38 @@ export const saveDb = async (data: Partial<DatabaseSchema>) => {
     
     const demandToSave = payloadForRpc.demand;
     delete payloadForRpc.demand;
+    
+    // Ensure all areas referenced in shifts, persons, or areas array exist in planning_areas table
+    if (payloadForRpc.shifts || payloadForRpc.persons || payloadForRpc.areas) {
+      const shiftAreas = (payloadForRpc.shifts || []).map(s => s.area).filter(Boolean);
+      const personAreas = (payloadForRpc.persons || []).map(p => p.area).filter(Boolean);
+      const passedAreas = (payloadForRpc.areas || []).filter(Boolean);
+      const allDistinctAreas = Array.from(new Set([
+        ...passedAreas,
+        ...shiftAreas,
+        ...personAreas,
+        'Admisión General',
+        'Admisión ART',
+        'Admisión',
+        'VACACIONES',
+        'FRANCO',
+        'ENFERMEDAD',
+        'FERIADO'
+      ]));
+
+      try {
+        await supabaseControl.from('planning_areas').upsert(
+          allDistinctAreas.map(name => ({ name })),
+          { onConflict: 'name' }
+        );
+      } catch (err) {
+        console.warn('Auto-upsert of planning_areas:', err);
+      }
+
+      if (payloadForRpc.areas) {
+        payloadForRpc.areas = allDistinctAreas;
+      }
+    }
 
     const { error } = await supabase.rpc('save_planning_data', { payload: payloadForRpc });
     if (error) throw error;
