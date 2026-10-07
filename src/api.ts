@@ -10,6 +10,97 @@ interface DatabaseSchema {
   attendance: AttendanceRecord[];
 }
 
+async function fetchDemandWithFallback(): Promise<any[]> {
+  // 1. First attempt: Supabase RPC fetch_planning_demand
+  try {
+    const { data: demandData, error: demandErr } = await supabase.rpc('fetch_planning_demand');
+    if (!demandErr && Array.isArray(demandData) && demandData.length > 0) {
+      try {
+        localStorage.setItem('_planning_cached_demand', JSON.stringify(demandData));
+      } catch (e) {}
+      return demandData;
+    }
+    if (demandErr) {
+      console.warn('fetch_planning_demand RPC timed out or failed (activating fast fallback):', demandErr.message);
+    }
+  } catch (err) {
+    console.warn('fetch_planning_demand RPC threw exception:', err);
+  }
+
+  // 2. Second attempt: Fast parallel query for active date window (previous month + current + next month)
+  try {
+    console.log('Fetching patient demand via fast direct fallback...');
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+
+    const pages = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000];
+    const [cobsRes, ...pageResults] = await Promise.all([
+      supabaseControl.from('turnera_coberturas').select('cobertura, clase'),
+      ...pages.map(offset =>
+        supabaseControl
+          .from('planning_patient_appointments')
+          .select('turno, cobertura')
+          .gte('turno', startDate)
+          .lte('turno', endDate)
+          .range(offset, offset + 999)
+      )
+    ]);
+
+    const allAppts: any[] = [];
+    pageResults.forEach(r => {
+      if (r.data) allAppts.push(...r.data);
+    });
+
+    if (allAppts.length > 0) {
+      const artSet = new Set(
+        (cobsRes.data || [])
+          .filter((c: any) => (c.clase || '').toLowerCase().includes('art'))
+          .map((c: any) => (c.cobertura || '').trim().toUpperCase())
+      );
+
+      const countMap = new Map<string, { date_string: string; hour: number; is_art: boolean; count: number }>();
+      allAppts.forEach(a => {
+        if (!a.turno) return;
+        const date_string = a.turno.substring(0, 10);
+        const hour = parseInt(a.turno.substring(11, 13), 10);
+        if (isNaN(hour) || hour < 0 || hour > 23) return;
+        const is_art = artSet.has((a.cobertura || '').trim().toUpperCase());
+        const key = `${date_string}_${hour}_${is_art}`;
+        const existing = countMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          countMap.set(key, { date_string, hour, is_art, count: 1 });
+        }
+      });
+
+      const aggregated = Array.from(countMap.values());
+      console.log(`✓ Fast fallback aggregated ${aggregated.length} demand records from ${allAppts.length} appointments.`);
+      try {
+        localStorage.setItem('_planning_cached_demand', JSON.stringify(aggregated));
+      } catch (e) {}
+      return aggregated;
+    }
+  } catch (fallbackErr) {
+    console.warn('Fast demand fallback encountered an issue:', fallbackErr);
+  }
+
+  // 3. Third attempt: Use cached demand from localStorage if available
+  try {
+    const cached = localStorage.getItem('_planning_cached_demand');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log(`Using cached demand records (${parsed.length} entries).`);
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  return [];
+}
+
 export const fetchDb = async (): Promise<DatabaseSchema> => {
   try {
     console.log("Fetching database via Supabase RPC...");
@@ -55,19 +146,9 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
       status: a.status
     }));
 
-    // 2. Fetch aggregated demand via RPC
-    console.log("Fetching demand via Supabase RPC...");
-    let rawDemand: any[] = [];
-    try {
-      const { data: demandData, error: demandErr } = await supabase.rpc('fetch_planning_demand');
-      if (demandErr) {
-        console.warn('fetch_planning_demand failed (non-fatal):', demandErr.message);
-      } else {
-        rawDemand = demandData || [];
-      }
-    } catch (demandEx) {
-      console.warn('fetch_planning_demand threw (non-fatal):', demandEx);
-    }
+    // 2. Fetch aggregated demand via resilient loader
+    console.log("Fetching demand via Supabase RPC / fallback...");
+    const rawDemand = await fetchDemandWithFallback();
 
     const demandMap: Record<string, DemandRecord> = {};
     (rawDemand || []).forEach((row: any) => {
@@ -210,19 +291,17 @@ export const saveDb = async (data: Partial<DatabaseSchema>) => {
       }
     }
 
-    // Save demand sequentially if provided
-    if (demandToSave) {
-      console.log("Saving demand separately...");
+    // Save demand sequentially ONLY if provided and contains records (prevents accidental wiping)
+    if (demandToSave && demandToSave.length > 0) {
+      console.log("Saving demand separately...", demandToSave.length);
       await supabaseControl.from('planning_demand').delete().neq('date_string', 'dummy_delete_val_xyz');
-      if (demandToSave.length > 0) {
-        const mappedDemand = demandToSave.map(d => ({
-          date_string: d.dateString,
-          area: d.area,
-          hourly_requirements: d.hourlyRequirements || []
-        }));
-        const { error: demandErr } = await supabaseControl.from('planning_demand').insert(mappedDemand);
-        if (demandErr) throw demandErr;
-      }
+      const mappedDemand = demandToSave.map(d => ({
+        date_string: d.dateString,
+        area: d.area,
+        hourly_requirements: d.hourlyRequirements || []
+      }));
+      const { error: demandErr } = await supabaseControl.from('planning_demand').insert(mappedDemand);
+      if (demandErr) throw demandErr;
     }
 
     console.log("✓ Saved successfully via Supabase RPC.");

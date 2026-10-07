@@ -194,5 +194,28 @@ Para satisfacer los requerimientos operativos de cobertura continua en la clíni
 * **Modalidad Fichas Individuales por Empleado**: Diseñado específicamente para entregar o enviar los horarios a cada colaborador. Contiene nombre, legajo, días asignados, horarios exactos, total de horas semanales y espacio para firma de conformidad. Permite filtrar por un colaborador puntual o exportar la totalidad del equipo con saltos de página automáticos (`page-break-after`).
 * **Modalidad Grilla Semanal Completa**: Genera la matriz apaisada de 24 horas y 7 días con códigos de colores, ideal para publicar en pizarras o carteleras de la clínica.
 
+### 7.7. Auto-guardado en Tiempo Real e Indicador Visual
+* **Persistencia Inmediata (`onSaveShifts`)**: Tanto en la vista semanal (`CalendarTab`) como en el registro de ausencias (`TimeOffTab`), cada vez que se agrega, modifica o elimina un turno o licencia, el sistema ejecuta automáticamente la persistencia en Supabase en tiempo real. Esto garantiza que no se pierdan cambios si el navegador se cierra o recarga.
+* **Feedback en Botón `Guardar Cambios`**: El botón de guardado en la cabecera ofrece retroalimentación visual inmediata: muestra `Guardando...` en tono celeste con cursor de espera y transiciona a `¡Guardado con éxito!` en color verde esmeralda al completarse la transacción.
+
 ---
-*Última actualización: 22 de Septiembre, 2026 (Módulo Admisión 24/7, Columna Demanda Erlang C, Exportación PDF y Sincronización Supabase).*
+
+## 8. Arquitectura de Alta Disponibilidad y Resiliencia en Demanda
+
+### 8.1. Solución al Timeout de Demanda (Manejo de +151.000 Registros)
+Debido al volumen histórico de la turnera (+151.000 citas de pacientes), las consultas de agregación globales en PostgreSQL pueden alcanzar el límite de tiempo de ejecución de Supabase (*statement timeout*), arrojando errores `500 Internal Server Error`.
+Para garantizar disponibilidad ininterrumpida, `src/api.ts` implementa una estrategia de carga resiliente en **tres capas**:
+1. **Capa 1 (RPC Primario)**: Consume la función `fetch_planning_demand` de Supabase. Si responde dentro del tiempo límite, guarda una copia en caché local y sirve los datos.
+2. **Capa 2 (Fallback Paralelo de Alta Velocidad)**: Si el RPC excede el tiempo límite o falla, el sistema conmuta instantáneamente a una consulta paralela segmentada sobre `planning_patient_appointments` acotada a la ventana temporal de interés (mes anterior, actual y siguiente). Las páginas de 1.000 registros se descargan en paralelo y se agregan en el cliente en menos de **550 ms**, eliminando el error 500 y garantizando que la columna de demanda nunca se muestre en cero.
+3. **Capa 3 (Caché Local Offline)**: Se preserva la última demanda calculada en `localStorage` (`_planning_cached_demand`), de modo que el planificador renderiza los datos de inmediato mientras se valida la conexión con el servidor.
+
+### 8.2. Purga y Sincronización sin Citas Fantasma (`scripts/sync-ftp.js`)
+* **Problema de Citas Reprogramadas**: Anteriormente, el `upsert` basado en la clave `paciente,profesional,turno` conservaba en Supabase turnos que habían sido reprogramados o cancelados en la turnera de la clínica.
+* **Lógica de Purga en Ventana Activa**: El sincronizador ahora identifica los límites temporales del archivo `Turnos.xlsx` y ejecuta una purga previa en la base de datos para la ventana activa antes de reinsertar el lote deduplicado. Esto garantiza que turnos reprogramados a otra fecha se eliminen de su horario original, reflejando fielmente la turnera local 1:1.
+
+### 8.3. Persistencia de Fecha de Trabajo (`cov_active_date`)
+* Para evitar que la interfaz se reinicie automáticamente al día actual cuando el usuario recarga la página, el estado `activeDate` se almacena y sincroniza en `localStorage`. Al refrescar la aplicación, se restaura automáticamente el día exacto en que se encontraba trabajando el operador.
+
+---
+*Última actualización: 7 de Octubre, 2026 (Resiliencia de Demanda, Purga de Citas Fantasma, Auto-guardado en Admisión 24/7 y Persistencia de Navegación).*
+

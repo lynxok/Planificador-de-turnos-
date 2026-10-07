@@ -71,33 +71,9 @@ async function runSync() {
       .select('profesional')
       .eq('tipo_consulta', 'REHABILITACION');
     
-    if (rehabErr) throw rehabErr;
+    if (rehabErr) console.warn("Warning fetching rehab profs:", rehabErr.message);
     const rehabProfsSet = new Set((rehabProfs || []).map(p => String(p.profesional).trim().toUpperCase()));
     console.log(`Loaded ${rehabProfsSet.size} rehabilitation professionals for blacklist filtering.`);
-
-    const rehabProfsList = (rehabProfs || []).map(p => String(p.profesional).trim());
-    if (rehabProfsList.length > 0) {
-      const today = new Date();
-      const startRange = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const startRangeStr = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
-      
-      const endRange = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-      const endRangeStr = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}T23:59:59`;
-      
-      console.log(`Purging existing rehabilitation appointments in Supabase from ${startRangeStr} to ${endRangeStr} to remove canceled/ghost sessions...`);
-      const { error: purgeErr } = await supabase
-        .from('planning_patient_appointments')
-        .delete()
-        .in('profesional', rehabProfsList)
-        .gte('turno', startRangeStr)
-        .lte('turno', endRangeStr);
-        
-      if (purgeErr) {
-        console.error("Warning: could not purge old rehab appointments:", purgeErr.message);
-      } else {
-        console.log("✓ Purged old rehab appointments successfully.");
-      }
-    }
 
     console.log("Reading Turnos workbook...");
     const workbook = XLSX.readFile(localExcelPath);
@@ -141,6 +117,29 @@ async function runSync() {
       const mappedRows = Array.from(uniqueMap.values());
       console.log(`Mapped ${mappedRows.length} unique rows.`);
       
+      if (mappedRows.length > 0) {
+        let minDateStr = mappedRows[0].turno;
+        let maxDateStr = mappedRows[0].turno;
+        for (const row of mappedRows) {
+          if (row.turno < minDateStr) minDateStr = row.turno;
+          if (row.turno > maxDateStr) maxDateStr = row.turno;
+        }
+        console.log(`Dataset date range: from ${minDateStr} to ${maxDateStr}`);
+
+        console.log(`Purging existing appointments in Supabase from ${minDateStr} to ${maxDateStr}...`);
+        const { error: purgeErr } = await supabase
+          .from('planning_patient_appointments')
+          .delete()
+          .gte('turno', minDateStr)
+          .lte('turno', maxDateStr);
+
+        if (purgeErr) {
+          console.error("Warning: could not purge old appointments:", purgeErr.message);
+        } else {
+          console.log("✓ Purged old appointments in sync window successfully.");
+        }
+      }
+
       const BATCH_SIZE = 1000;
       console.log(`Upserting to Supabase in batches of ${BATCH_SIZE}...`);
       for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {

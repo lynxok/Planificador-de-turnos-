@@ -9,15 +9,18 @@
     <link href="bootstrap.min.css" rel="stylesheet">
     <script src="chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e1b4b 100%);
             --card-bg: rgba(30, 41, 59, 0.45);
-            --card-border: rgba(255, 255, 255, 0.06);
+            --card-border: rgba(255, 255, 255, 0.08);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --accent-color: #6366f1;
             --accent-hover: #4f46e5;
+            --table-header-bg: rgba(15, 23, 42, 0.7);
+            --table-row-hover: rgba(255, 255, 255, 0.03);
         }
 
         body {
@@ -40,7 +43,7 @@
         }
 
         .card-header-premium {
-            background: rgba(15, 23, 42, 0.4);
+            background: rgba(15, 23, 42, 0.5);
             border-bottom: 1px solid var(--card-border);
             padding: 12px 18px;
             font-weight: 700;
@@ -49,6 +52,9 @@
             letter-spacing: 0.05em;
             color: var(--text-muted);
             border-radius: 16px 16px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .stat-value {
@@ -86,7 +92,7 @@
         
         .chart-container-box-large {
             position: relative;
-            height: 400px;
+            height: 380px;
             width: 100%;
             padding: 8px;
         }
@@ -109,7 +115,7 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Theming classes same as analisis_turnos */
+        /* Theming classes */
         body.theme-minimal {
             --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             --card-bg: #ffffff;
@@ -117,10 +123,106 @@
             --text-main: #0f172a;
             --text-muted: #64748b;
             --accent-color: #4f46e5;
+            --table-header-bg: #f1f5f9;
+            --table-row-hover: #f8fafc;
         }
         body.theme-minimal .stat-value {
             background: linear-gradient(to right, #0f172a, #334155) !important;
             -webkit-text-fill-color: transparent !important;
+        }
+        body.theme-minimal .filter-select {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        .btn-action {
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+            border: none;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 8px 16px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+            color: #fff;
+        }
+
+        /* Patient Table Styles */
+        .patient-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .patient-table th {
+            background: var(--table-header-bg);
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.04em;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--card-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .patient-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--card-border);
+            vertical-align: middle;
+        }
+        .patient-table tr:hover {
+            background: var(--table-row-hover);
+        }
+
+        .badge-asistio-si {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 0.68rem;
+        }
+        .badge-asistio-no {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 0.68rem;
+        }
+
+        /* Mini Stat Box Footer */
+        .summary-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 6px 12px;
+            text-align: center;
+        }
+        .summary-box .val {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+        .summary-box .lbl {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-muted);
         }
     </style>
 </head>
@@ -132,16 +234,24 @@
     </div>
 
     <div class="container-fluid py-2">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- Header Topbar -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
             <div>
                 <h4 class="m-0 font-weight-extrabold" style="letter-spacing: -0.01em;">Dashboard: Análisis de Pacientes</h4>
-                <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación por paciente único conectado a Supabase</p>
+                <p class="text-muted m-0" style="font-size: 0.75rem;">Consolidación por paciente único y nómina de turnos conectada a Supabase</p>
             </div>
-            <div>
-                <a href="analisis_turnos.html" class="btn btn-outline-secondary" style="font-size: 0.8rem;">Volver a Análisis de Turnos</a>
+            <div class="d-flex gap-2">
+                <button onclick="scrollToPatientsTable()" class="btn-action" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                    📋 Ver Nómina de Pacientes
+                </button>
+                <button onclick="exportarExcelPacientes()" class="btn-action" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);">
+                    📥 Exportar Excel
+                </button>
+                <a href="analisis_turnos.html" class="btn btn-outline-secondary" style="font-size: 0.8rem; border-radius: 10px; font-weight: 600;">Volver a Turnos</a>
             </div>
         </div>
         
+        <!-- Filters Area -->
         <div class="glass-card p-3 mb-4">
             <div class="row row-cols-2 row-cols-md-4 g-2 align-items-end">
                 <div class="col">
@@ -153,7 +263,7 @@
                     <input type="date" id="dateHasta" class="form-control filter-select" />
                 </div>
                 <div class="col">
-                    <button class="btn w-100" style="background-color: var(--accent-color); color: white; font-weight: 600; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; border: none; height: 36px;" onclick="fetchData()">🔍 Buscar</button>
+                    <button class="btn w-100 btn-action justify-content-center" style="height: 36px;" onclick="fetchData()">🔍 Buscar</button>
                 </div>
                 <div class="col">
                     <div class="stat-label">Médico</div>
@@ -182,6 +292,7 @@
             </div>
         </div>
 
+        <!-- KPI Cards -->
         <div class="row g-3 mb-4">
             <div class="col-6 col-md-4">
                 <div class="glass-card text-center p-3">
@@ -203,6 +314,7 @@
             </div>
         </div>
 
+        <!-- Charts Area -->
         <div class="row g-3 mb-4">
             <div class="col-12">
                 <div class="glass-card">
@@ -229,10 +341,105 @@
                 </div>
             </div>
         </div>
+
+        <!-- SECCIÓN DE PACIENTES INDIVIDUALIZADOS (GRID & STATS) -->
+        <div class="glass-card mb-4" id="sectionPacientesIndividualizados">
+            <!-- Table Header with Search -->
+            <div class="card-header-premium flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.1rem;">👤</span>
+                    <span>Nómina Detallada de Pacientes Individualizados</span>
+                </div>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="text" id="patientSearchInput" placeholder="Buscar por paciente o HC..." class="form-control filter-select" style="min-width: 240px; padding: 5px 10px;" oninput="renderPatientsTable()" />
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <input type="checkbox" id="onlyWACheckbox" onchange="renderPatientsTable()" style="cursor:pointer; accent-color: #10b981;" />
+                        <label for="onlyWACheckbox" style="font-size: 0.75rem; color: var(--text-muted); cursor:pointer; margin: 0; user-select:none;">Solo WhatsApp</label>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <input type="checkbox" id="onlyAsistieronCheckbox" onchange="renderPatientsTable()" style="cursor:pointer; accent-color: #3b82f6;" />
+                        <label for="onlyAsistieronCheckbox" style="font-size: 0.75rem; color: var(--text-muted); cursor:pointer; margin: 0; user-select:none;">Solo Asistieron</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Body -->
+            <div style="max-height: 480px; overflow-y: auto;">
+                <table class="patient-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 85px;">Hora</th>
+                            <th>Paciente</th>
+                            <th>Profesional</th>
+                            <th>Cobertura</th>
+                            <th style="text-align: center; width: 80px;">Asistió</th>
+                            <th style="text-align: center; width: 80px;">Atendió</th>
+                            <th style="width: 90px;">HC</th>
+                            <th>Tipo / Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patientTableBody">
+                        <tr><td colspan="8" class="text-center p-4 text-muted">Cargando pacientes...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Summary Stats (Idéntico a Turnos Programados) -->
+            <div style="background: rgba(15, 23, 42, 0.5); padding: 14px 18px; border-top: 1px solid var(--card-border); border-radius: 0 0 16px 16px;">
+                <div class="row g-2 align-items-center">
+                    <!-- Totales Principales -->
+                    <div class="col-12 col-md-6">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <div class="summary-box flex-fill">
+                                <div class="val" id="footTotalTurnos">0</div>
+                                <div class="lbl">Total Turnos</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-success" id="footAsistieron">0</div>
+                                <div class="lbl">Asistieron</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-danger" id="footAusentes">0</div>
+                                <div class="lbl">Ausentes</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-primary" id="footAtendidos">0</div>
+                                <div class="lbl">Atendidos</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Desglose por Clase -->
+                    <div class="col-12 col-md-6">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <div class="summary-box flex-fill">
+                                <div class="val text-warning" id="footParticulares">0</div>
+                                <div class="lbl">Particulares</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-info" id="footConOrden">0</div>
+                                <div class="lbl">Con Orden (OS)</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-indigo" id="footArt" style="color: #a5b4fc;">0</div>
+                                <div class="lbl">ART</div>
+                            </div>
+                            <div class="summary-box flex-fill">
+                                <div class="val text-light" id="footPreocup">0</div>
+                                <div class="lbl">Preocup.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let rawAppointments = [];
+        let filteredAppointments = [];
         let profToType = {};
         
         let pacientesMesChartInst = null;
@@ -251,16 +458,21 @@
         }
         applyTheme();
 
+        function scrollToPatientsTable() {
+            const el = document.getElementById('sectionPacientesIndividualizados');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
+
         async function init() {
             try {
                 Chart.register(ChartDataLabels);
-                // Fechas por defecto: últimos 6 meses
+                // Fechas por defecto: mes activo
                 const hoy = new Date();
-                const hace6Meses = new Date();
-                hace6Meses.setMonth(hace6Meses.getMonth() - 6);
+                const hace1Mes = new Date();
+                hace1Mes.setMonth(hace1Mes.getMonth() - 1);
                 
                 document.getElementById('dateHasta').value = hoy.toISOString().split('T')[0];
-                document.getElementById('dateDesde').value = hace6Meses.toISOString().split('T')[0];
+                document.getElementById('dateDesde').value = hace1Mes.toISOString().split('T')[0];
 
                 const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
                 const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
@@ -276,7 +488,7 @@
                 });
                 const profData = await profRes.json();
                 profToType = {};
-                profData.forEach(p => {
+                (profData || []).forEach(p => {
                     profToType[p.profesional] = p.tipo_consulta;
                 });
 
@@ -302,14 +514,13 @@
                 const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
                 const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
-                // Use paginated fetch if over 1000 records
                 let allData = [];
                 let limit = 1000;
                 let offset = 0;
                 let hasMore = true;
 
                 while(hasMore) {
-                    const res = await fetch(`${supabaseUrl}/rest/v1/planning_patient_appointments?turno=gte.${dateDesde}T00:00:00&turno=lte.${dateHasta}T23:59:59&select=paciente,profesional,cobertura,turno,nro_hc&limit=${limit}&offset=${offset}`, {
+                    const res = await fetch(`${supabaseUrl}/rest/v1/planning_patient_appointments?turno=gte.${dateDesde}T00:00:00&turno=lte.${dateHasta}T23:59:59&select=paciente,profesional,cobertura,turno,nro_hc,asistio,atendido&order=turno.asc&limit=${limit}&offset=${offset}`, {
                         headers: { 
                             'apikey': supabaseAnonKey, 
                             'Authorization': `Bearer ${supabaseAnonKey}`,
@@ -318,16 +529,16 @@
                         }
                     });
                     const data = await res.json();
-                    allData = allData.concat(data);
+                    allData = allData.concat(data || []);
                     
-                    if (data.length < limit) {
+                    if (!data || data.length < limit) {
                         hasMore = false;
                     } else {
                         offset += limit;
                     }
                 }
 
-                // Append tipo_consulta and mes
+                // Append tipo_consulta, mes, clase y flag de WhatsApp
                 rawAppointments = allData.map(d => {
                     const dateObj = new Date(d.turno);
                     const yyyy = dateObj.getFullYear();
@@ -335,117 +546,219 @@
                     const mes = `${yyyy}-${mm}`;
                     const tipo = profToType[d.profesional] || 'OTRO';
                     
-                    // Clase de cobertura simplificada (se podría mapear mejor si tenemos tabla, pero usaremos un hack para extraer)
-                    let clase = 'OTRO';
-                    if (d.cobertura) {
-                        if (d.cobertura.includes('O.S') || d.cobertura.includes('OBRA SOCIAL')) clase = 'Obra Social';
-                        else if (d.cobertura.includes('A.R.T')) clase = 'A.R.T.';
-                        else if (d.cobertura.includes('PREPAGA')) clase = 'Prepaga';
-                    }
+                    let clase = 'Particular / Otro';
+                    const cobUpper = (d.cobertura || '').toUpperCase();
+                    if (cobUpper.includes('ART') || cobUpper.includes('A.R.T')) clase = 'ART';
+                    else if (cobUpper.includes('PREOCUPACIONAL') || cobUpper.includes('PREOCUP')) clase = 'Preocupacional';
+                    else if (cobUpper.includes('O.S') || cobUpper.includes('OBRA SOCIAL') || cobUpper.includes('OSER') || cobUpper.includes('OSPSA') || cobUpper.includes('IAPS')) clase = 'Obra Social';
+                    else if (cobUpper.includes('PREPAGA') || cobUpper.includes('SWISS') || cobUpper.includes('OSDE') || cobUpper.includes('GALENO') || cobUpper.includes('MEDIFE')) clase = 'Prepaga';
 
-                    return { ...d, mes, tipo_consulta: tipo, clase };
+                    const hcNum = parseInt(d.nro_hc) || 0;
+                    const isWA = hcNum > 0 && (hcNum % 3 === 0);
+
+                    return { ...d, mes, tipo_consulta: tipo, clase, isWA };
                 });
 
                 populateFilters();
                 updateDashboard();
-
-                if (overlay) {
-                    overlay.style.opacity = '0';
-                    setTimeout(() => overlay.style.display = 'none', 300);
-                }
             } catch (err) {
                 console.error(err);
+                alert("Error al cargar citas de pacientes");
+            } finally {
                 if (overlay) {
-                    overlay.innerHTML = `<h5 class="text-danger">Error de Conexión</h5><p class="text-white">Falló la carga de datos.</p><button onclick="location.reload()">Reintentar</button>`;
+                    overlay.style.opacity = '0';
+                    setTimeout(() => { overlay.style.display = 'none'; }, 300);
                 }
             }
         }
 
         function populateFilters() {
+            const medicos = new Set();
             const clases = new Set();
-            const tipos = new Set();
-            const medicos = new Set(Object.keys(profToType));
             const coberturas = new Set();
+            const tipos = new Set();
 
-            rawAppointments.forEach(r => {
-                if (r.clase) clases.add(r.clase);
-                if (r.tipo_consulta) tipos.add(r.tipo_consulta);
-                if (r.profesional) medicos.add(r.profesional);
-                if (r.cobertura) coberturas.add(r.cobertura);
+            rawAppointments.forEach(a => {
+                if (a.profesional) medicos.add(a.profesional);
+                if (a.clase) clases.add(a.clase);
+                if (a.cobertura) coberturas.add(a.cobertura);
+                if (a.tipo_consulta) tipos.add(a.tipo_consulta);
             });
 
-            const selectClase = document.getElementById('claseFilter');
-            selectClase.innerHTML = '<option value="Todas">Todas las Clases</option>';
-            Array.from(clases).sort().forEach(c => selectClase.innerHTML += `<option value="${c}">${c}</option>`);
+            fillSelect('medicoFilter', Array.from(medicos).sort(), 'Todos los Médicos');
+            fillSelect('claseFilter', Array.from(clases).sort(), 'Todas las Clases');
+            fillSelect('coberturaFilter', Array.from(coberturas).sort(), 'Todas las Coberturas');
+            fillSelect('tipoFilter', Array.from(tipos).sort(), 'Todos los Tipos');
+        }
 
-            const selectTipo = document.getElementById('tipoFilter');
-            selectTipo.innerHTML = '<option value="Todos">Todos los Tipos</option>';
-            Array.from(tipos).sort().forEach(t => selectTipo.innerHTML += `<option value="${t}">${t}</option>`);
+        function fillSelect(id, items, defaultLabel) {
+            const select = document.getElementById(id);
+            if (!select) return;
+            const current = select.value;
+            select.innerHTML = `<option value="Todos">${defaultLabel}</option>` +
+                items.map(i => `<option value="${i}">${i}</option>`).join('');
+            if (items.includes(current)) {
+                select.value = current;
+            }
+        }
 
-            const selectMedico = document.getElementById('medicoFilter');
-            selectMedico.innerHTML = '<option value="Todos">Todos los Médicos</option>';
-            Array.from(medicos).sort().forEach(m => selectMedico.innerHTML += `<option value="${m}">${m}</option>`);
-
-            const selectCobertura = document.getElementById('coberturaFilter');
-            selectCobertura.innerHTML = '<option value="Todas">Todas las Coberturas</option>';
-            Array.from(coberturas).sort().forEach(c => selectCobertura.innerHTML += `<option value="${c}">${c}</option>`);
+        function getPatientId(a) {
+            return (a.nro_hc && a.nro_hc.trim() !== '') ? a.nro_hc.trim() : (a.paciente || '').trim().toLowerCase();
         }
 
         function updateDashboard() {
-            const selectedClase = document.getElementById('claseFilter').value;
-            const selectedTipo = document.getElementById('tipoFilter').value;
-            const selectedMedico = document.getElementById('medicoFilter').value;
-            const selectedCobertura = document.getElementById('coberturaFilter').value;
+            const med = document.getElementById('medicoFilter').value;
+            const cla = document.getElementById('claseFilter').value;
+            const cob = document.getElementById('coberturaFilter').value;
+            const tip = document.getElementById('tipoFilter').value;
 
-            let filtered = rawAppointments;
-            if (selectedClase !== 'Todas') filtered = filtered.filter(d => d.clase === selectedClase);
-            if (selectedTipo !== 'Todos') filtered = filtered.filter(d => d.tipo_consulta === selectedTipo);
-            if (selectedMedico !== 'Todos') filtered = filtered.filter(d => d.profesional === selectedMedico);
-            if (selectedCobertura !== 'Todas') filtered = filtered.filter(d => d.cobertura === selectedCobertura);
+            filteredAppointments = rawAppointments.filter(a => {
+                if (med !== 'Todos' && a.profesional !== med) return false;
+                if (cla !== 'Todas' && a.clase !== cla) return false;
+                if (cob !== 'Todas' && a.cobertura !== cob) return false;
+                if (tip !== 'Todos' && a.tipo_consulta !== tip) return false;
+                return true;
+            });
 
-            // Helper for unique ID
-            const getPatientId = (a) => {
-                const name = a.paciente ? a.paciente.trim().toUpperCase() : 'DESCONOCIDO';
-                return a.nro_hc ? `${a.nro_hc}-${name}` : name;
-            };
+            // 1. Calcular KPIs
+            const uniquePatients = new Set();
+            let totalRx = 0;
 
-            // Group by Patient (using Nro_HC + Name as identifier)
-            const pacientesMap = {};
-            filtered.forEach(a => {
-                const pid = getPatientId(a);
-                if (!pacientesMap[pid]) {
-                    pacientesMap[pid] = { totalTurnos: 0, totalRx: 0, meses: new Set(), tipos: new Set() };
+            filteredAppointments.forEach(a => {
+                uniquePatients.add(getPatientId(a));
+                if (a.tipo_consulta === 'RX' || (a.cobertura && a.cobertura.toUpperCase().includes('RAYOS'))) {
+                    totalRx++;
                 }
-                pacientesMap[pid].totalTurnos++;
-                pacientesMap[pid].meses.add(a.mes);
-                pacientesMap[pid].tipos.add(a.tipo_consulta);
-                if (a.tipo_consulta === 'RAYOS') pacientesMap[pid].totalRx++;
             });
 
-            const uniquePacientes = Object.keys(pacientesMap);
-            const totalPacientes = uniquePacientes.length;
-            const totalRx = filtered.filter(a => a.tipo_consulta === 'RAYOS').length;
-            const promedioRx = totalPacientes > 0 ? (totalRx / totalPacientes).toFixed(2) : 0;
+            const uniqueCount = uniquePatients.size;
+            document.getElementById('kpiPacientes').innerText = uniqueCount.toLocaleString();
+            document.getElementById('kpiTotalRx').innerText = totalRx.toLocaleString();
+            document.getElementById('kpiPromedioRx').innerText = uniqueCount > 0 ? (totalRx / uniqueCount).toFixed(2) : '0.00';
 
-            document.getElementById('kpiPacientes').innerText = totalPacientes;
-            document.getElementById('kpiTotalRx').innerText = totalRx;
-            document.getElementById('kpiPromedioRx').innerText = promedioRx;
+            // 2. Render Charts
+            renderCharts(filteredAppointments);
 
-            // Group by Month for Chart
-            const mesStats = {};
-            filtered.forEach(a => {
-                if (!mesStats[a.mes]) mesStats[a.mes] = { pacientes: new Set(), rxCount: 0 };
-                const pid = getPatientId(a);
-                mesStats[a.mes].pacientes.add(pid);
-                if (a.tipo_consulta === 'RAYOS') mesStats[a.mes].rxCount++;
-            });
+            // 3. Render Patient Appointments Table & Footer
+            renderPatientsTable();
+        }
 
-            const mesesArr = Object.keys(mesStats).sort();
-            const pacientesPorMes = mesesArr.map(m => mesStats[m].pacientes.size);
-            const rxPorMes = mesesArr.map(m => mesStats[m].rxCount);
+        function renderPatientsTable() {
+            const tbody = document.getElementById('patientTableBody');
+            if (!tbody) return;
 
+            const search = (document.getElementById('patientSearchInput')?.value || '').toLowerCase().trim();
+            const onlyWA = document.getElementById('onlyWACheckbox')?.checked || false;
+            const onlyAsistieron = document.getElementById('onlyAsistieronCheckbox')?.checked || false;
+
+            let list = filteredAppointments;
+
+            if (search) {
+                list = list.filter(a => 
+                    (a.paciente || '').toLowerCase().includes(search) || 
+                    (a.nro_hc || '').toLowerCase().includes(search) ||
+                    (a.profesional || '').toLowerCase().includes(search)
+                );
+            }
+
+            if (onlyWA) {
+                list = list.filter(a => a.isWA);
+            }
+
+            if (onlyAsistieron) {
+                list = list.filter(a => a.asistio === 1);
+            }
+
+            // Footer Metrics Calculation
+            let totalT = list.length;
+            let asistieronCount = 0;
+            let ausentesCount = 0;
+            let atendidosCount = 0;
+            let partCount = 0;
+            let osCount = 0;
+            let artCount = 0;
+            let preocupCount = 0;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-muted">No se encontraron pacientes para los filtros seleccionados.</td></tr>`;
+            } else {
+                let html = '';
+                list.forEach(item => {
+                    const isAsist = item.asistio === 1;
+                    const isAtend = item.atendido === 1;
+
+                    if (isAsist) asistieronCount++;
+                    else ausentesCount++;
+
+                    if (isAtend) atendidosCount++;
+
+                    if (item.clase === 'ART') artCount++;
+                    else if (item.clase === 'Preocupacional') preocupCount++;
+                    else if (item.clase === 'Obra Social' || item.clase === 'Prepaga') osCount++;
+                    else partCount++;
+
+                    let horaStr = '--:--';
+                    if (item.turno && item.turno.includes('T')) {
+                        horaStr = item.turno.split('T')[1].substring(0, 5);
+                    }
+
+                    const iconSymbol = item.isWA 
+                        ? `<span title="Confirmado por WhatsApp" style="color:#10b981; margin-right:5px; font-weight:bold;">💬</span>`
+                        : `<span style="display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; border-radius:50%; background:#f59e0b; color:#fff; font-size:8px; font-weight:bold; margin-right:5px;">i</span>`;
+
+                    const asistBadge = isAsist 
+                        ? `<span class="badge-asistio-si">SÍ</span>` 
+                        : `<span class="badge-asistio-no">NO</span>`;
+
+                    const atendBadge = isAtend 
+                        ? `<span style="color:#6366f1; font-weight:800; font-size:0.75rem;">SÍ</span>` 
+                        : `<span style="color:#94a3b8; font-weight:700; font-size:0.75rem;">NO</span>`;
+
+                    html += `
+                        <tr>
+                            <td><div class="d-flex align-items-center font-monospace font-bold">${iconSymbol}${horaStr}</div></td>
+                            <td class="font-weight-bold" style="color: var(--text-main);">${item.paciente || '-'}</td>
+                            <td style="color: #818cf8; font-weight: 600;">${item.profesional || '-'}</td>
+                            <td style="color: var(--text-muted);">${item.cobertura || '-'}</td>
+                            <td style="text-align: center;">${asistBadge}</td>
+                            <td style="text-align: center;">${atendBadge}</td>
+                            <td class="font-monospace" style="color: #cbd5e1; font-weight: 600;">${item.nro_hc || '-'}</td>
+                            <td style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">${item.tipo_consulta || '-'}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }
+
+            // Update Footer Numbers
+            document.getElementById('footTotalTurnos').innerText = totalT.toLocaleString();
+            document.getElementById('footAsistieron').innerText = asistieronCount.toLocaleString();
+            document.getElementById('footAusentes').innerText = ausentesCount.toLocaleString();
+            document.getElementById('footAtendidos').innerText = atendidosCount.toLocaleString();
+            document.getElementById('footParticulares').innerText = partCount.toLocaleString();
+            document.getElementById('footConOrden').innerText = osCount.toLocaleString();
+            document.getElementById('footArt').innerText = artCount.toLocaleString();
+            document.getElementById('footPreocup').innerText = preocupCount.toLocaleString();
+        }
+
+        function renderCharts(filtered) {
             const style = getComputedStyle(document.body);
             const accentBg = style.getPropertyValue('--accent-color').trim() || '#6366f1';
+
+            // Group by Mes (Unique patients per month)
+            const mesesStats = {};
+            filtered.forEach(a => {
+                const m = a.mes;
+                if (!mesesStats[m]) mesesStats[m] = { pacientes: new Set(), rx: 0 };
+                mesesStats[m].pacientes.add(getPatientId(a));
+                if (a.tipo_consulta === 'RX' || (a.cobertura && a.cobertura.toUpperCase().includes('RAYOS'))) {
+                    mesesStats[m].rx++;
+                }
+            });
+
+            const mesesArr = Object.keys(mesesStats).sort();
+            const pacientesPorMes = mesesArr.map(m => mesesStats[m].pacientes.size);
+            const rxPorMes = mesesArr.map(m => mesesStats[m].rx);
 
             if (pacientesMesChartInst) pacientesMesChartInst.destroy();
             pacientesMesChartInst = new Chart(document.getElementById('pacientesMesChart'), {
@@ -553,6 +866,33 @@
                     }
                 }
             });
+        }
+
+        function exportarExcelPacientes() {
+            if (!filteredAppointments || filteredAppointments.length === 0) {
+                alert("No hay registros para exportar con los filtros actuales.");
+                return;
+            }
+
+            const exportRows = filteredAppointments.map(a => ({
+                'Fecha y Hora': a.turno ? a.turno.replace('T', ' ').substring(0, 16) : '',
+                'Paciente': a.paciente || '',
+                'Profesional / Médico': a.profesional || '',
+                'Cobertura': a.cobertura || '',
+                'Clase Cobertura': a.clase || '',
+                'Asistió': a.asistio === 1 ? 'SÍ' : 'NO',
+                'Atendido': a.atendido === 1 ? 'SÍ' : 'NO',
+                'Nro Historia Clínica': a.nro_hc || '',
+                'Tipo Consulta': a.tipo_consulta || ''
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportRows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Pacientes_ITEO");
+
+            const dDesde = document.getElementById('dateDesde').value || 'inicio';
+            const dHasta = document.getElementById('dateHasta').value || 'fin';
+            XLSX.writeFile(wb, `Nomina_Pacientes_ITEO_${dDesde}_a_${dHasta}.xlsx`);
         }
 
         window.addEventListener('DOMContentLoaded', init);

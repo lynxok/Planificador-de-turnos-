@@ -88,12 +88,22 @@ export default function App() {
 
   // 2. Navigation/View States
   const [activeDate, setActiveDate] = useState(() => {
+    const saved = localStorage.getItem('cov_active_date');
+    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
+      return saved;
+    }
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+
+  useEffect(() => {
+    if (activeDate) {
+      localStorage.setItem('cov_active_date', activeDate);
+    }
+  }, [activeDate]);
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'analysis' | 'staff' | 'reports'>('day');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [showResourceSidebar, setShowResourceSidebar] = useState<boolean>(true);
@@ -321,11 +331,11 @@ export default function App() {
         shifts,
         targets,
         areas,
-        demand,
+        demand: (demand && demand.length > 0) ? demand : undefined,
         attendance
       });
       setHasUnsavedChanges(false);
-      alert('¡Planificación guardada exitosamente en la base de datos de Neon Postgres!');
+      alert('¡Planificación guardada exitosamente en la base de datos de Supabase!');
     } catch (error) {
       console.error('Failed manual save', error);
       alert('Ocurrió un error al intentar guardar la planificación en la base de datos.');
@@ -1716,8 +1726,12 @@ export default function App() {
                   setShifts={setShifts} 
                   areas={areas}
                   onSave={handleManualSave}
-targets={targets}
-demand={demand} 
+                  onSaveShifts={(newShifts) => {
+                    setShifts(newShifts);
+                    saveToLocalStorage(persons, newShifts, targets);
+                  }}
+                  targets={targets}
+                  demand={demand} 
                 />
               </div>
             ) : (

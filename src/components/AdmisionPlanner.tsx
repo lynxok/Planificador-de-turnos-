@@ -10,6 +10,7 @@ interface AdmisionPlannerProps {
   setPersons: React.Dispatch<React.SetStateAction<Person[]>>;
   setShifts: React.Dispatch<React.SetStateAction<Shift[]>>;
   onSave: () => void;
+  onSaveShifts?: (newShifts: Shift[]) => void;
   areas: Area[];
   targets?: any[];
   demand?: any[];
@@ -61,10 +62,22 @@ function calculateAgentsRequired(
   return m;
 }
 
-export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts, onSave, areas, targets = [], demand = [] }: AdmisionPlannerProps) {
+export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts, onSave, onSaveShifts, areas, targets = [], demand = [] }: AdmisionPlannerProps) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'staff' | 'timeoff'>('calendar');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  const handleSaveClick = async () => {
+    setSaveStatus('saving');
+    try {
+      await onSave();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+    } catch (e) {
+      setSaveStatus('idle');
+    }
+  };
   
   return (
     <div className={`h-full flex flex-col ${theme.timelineBg} ${theme.timelineHeaderText}`}>
@@ -84,11 +97,18 @@ export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts,
               Exportar / Imprimir PDF
             </button>
             <button 
-              onClick={onSave}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-95 cursor-pointer"
+              onClick={handleSaveClick}
+              disabled={saveStatus === 'saving'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-md active:scale-95 cursor-pointer ${
+                saveStatus === 'saved' 
+                  ? 'bg-emerald-600 text-white' 
+                  : saveStatus === 'saving' 
+                    ? 'bg-blue-400 text-white cursor-wait' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               <Save size={18} />
-              Guardar Cambios
+              {saveStatus === 'saved' ? '¡Guardado con éxito!' : saveStatus === 'saving' ? 'Guardando...' : 'Guardar Cambios'}
             </button>
           </div>
         </div>
@@ -127,6 +147,7 @@ export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts,
             persons={persons} 
             shifts={shifts} 
             setShifts={setShifts} 
+            onSaveShifts={onSaveShifts}
             targets={targets} 
             demand={demand} 
           />
@@ -144,6 +165,7 @@ export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts,
             persons={persons}
             shifts={shifts}
             setShifts={setShifts}
+            onSaveShifts={onSaveShifts}
           />
         )}
       </div>
@@ -161,7 +183,7 @@ export function AdmisionPlanner({ theme, persons, shifts, setPersons, setShifts,
   );
 }
 
-function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setShifts, targets, demand }: any) {
+function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setShifts, onSaveShifts, targets, demand }: any) {
   const [assignModal, setAssignModal] = useState<{isOpen: boolean, dateStr: string, hour: number, endHour: number, selectedPersons: Set<string>, shiftArea: string} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -209,7 +231,9 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
   };
 
   const handleDeleteShift = (id: string) => {
-    setShifts((prev: Shift[]) => prev.filter(s => s.id !== id));
+    const updated = shifts.filter((s: Shift) => s.id !== id);
+    setShifts(updated);
+    if (onSaveShifts) onSaveShifts(updated);
   };
 
   const handleSaveAssignment = () => {
@@ -227,7 +251,9 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
       area: assignModal.shiftArea
     }));
     
-    setShifts((prev: Shift[]) => [...prev, ...newShifts]);
+    const updated = [...shifts, ...newShifts];
+    setShifts(updated);
+    if (onSaveShifts) onSaveShifts(updated);
     setAssignModal(null);
   };
 
@@ -492,7 +518,7 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
   );
 }
 
-function TimeOffTab({ theme, persons, shifts, setShifts }: any) {
+function TimeOffTab({ theme, persons, shifts, setShifts, onSaveShifts }: any) {
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState<{ personId: string; type: string; startDate: string; endDate: string }>({
     personId: '',
@@ -526,12 +552,16 @@ function TimeOffTab({ theme, persons, shifts, setShifts }: any) {
       curr.setDate(curr.getDate() + 1);
     }
 
-    setShifts((prev: Shift[]) => [...prev, ...newShifts]);
+    const updated = [...shifts, ...newShifts];
+    setShifts(updated);
+    if (onSaveShifts) onSaveShifts(updated);
     setModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
-    setShifts((prev: Shift[]) => prev.filter(s => s.id !== id));
+    const updated = shifts.filter((s: Shift) => s.id !== id);
+    setShifts(updated);
+    if (onSaveShifts) onSaveShifts(updated);
   };
 
   return (
