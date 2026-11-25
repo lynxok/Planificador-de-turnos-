@@ -4,6 +4,8 @@ export interface Person {
   id: string;
   name: string;
   area: Area;
+  subArea?: Area;            // Segunda área o subcategoría (ej: "Atención")
+  puesto?: string;           // Puesto de trabajo específico (ej: "Atención", "Coordinación", etc.)
   maxDailyHours: number;
   availabilityStart: number; // e.g., 8 (08:00)
   availabilityEnd: number;   // e.g., 18 (18:00)
@@ -41,5 +43,6 @@ export interface DemandRecord {
   hourlyRequirements: number[]; // array of 24 numbers
   hourlyArtPatients?: number[]; // array of 24 numbers
   hourlyOsPatients?: number[];  // array of 24 numbers
+  hourlyGuardiaPatients?: number[]; // array of 24 numbers (demanda de guardia)
 }
 

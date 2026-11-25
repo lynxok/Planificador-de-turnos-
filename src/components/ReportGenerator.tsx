@@ -205,12 +205,12 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
       return acc;
     }, {});
 
-  const funnelData = Object.entries(coverageCounts)
-    .map(([name, count]) => ({ name, count }))
+  const funnelData: { name: string; count: number }[] = Object.entries(coverageCounts)
+    .map(([name, count]) => ({ name, count: Number(count) }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  const maxFunnelCount = funnelData.length > 0 ? funnelData[0].count : 1;
+  const maxFunnelCount: number = funnelData.length > 0 ? Number(funnelData[0].count) : 1;
 
   // 2. Histogram Data (Turnos por Día)
   const turnosPorDia = reportData.reduce((acc: { [key: string]: number }, cur) => {
@@ -221,15 +221,15 @@ export function ReportGenerator({ theme }: ReportGeneratorProps) {
     return acc;
   }, {});
 
-  const histogramData = Object.entries(turnosPorDia)
+  const histogramData: { dateStr: string; formatted: string; count: number }[] = Object.entries(turnosPorDia)
     .map(([dateStr, count]) => {
       const parts = dateStr.split('-');
       const formatted = `${parts[2]}/${parts[1]}`;
-      return { dateStr, formatted, count };
+      return { dateStr, formatted, count: Number(count) };
     })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
-  const maxHistogramCount = histogramData.length > 0 ? Math.max(...histogramData.map(d => d.count)) : 1;
+  const maxHistogramCount: number = histogramData.length > 0 ? Math.max(...histogramData.map(d => Number(d.count))) : 1;
 
   return (
     <div className={`flex-1 w-full ${theme.cardBg} rounded-2xl border ${theme.cardBorder} shadow-xl flex flex-col p-6 animate-fade-in`}>

@@ -244,7 +244,7 @@ function CalendarTab({ theme, currentDate, setCurrentDate, persons, shifts, setS
     
     const newShifts: Shift[] = Array.from(assignModal.selectedPersons).map(personId => ({
       id: crypto.randomUUID(),
-      personId,
+      personId: String(personId),
       date: assignModal.dateStr,
       startHour: assignModal.hour,
       duration: duration,

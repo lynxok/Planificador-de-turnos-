@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Person, Area } from '../types';
-import { getInitials, formatHour, parseHour } from '../utils';
+import { getInitials, formatHour, formatTimeInput, parseHour } from '../utils';
 import { X, User, LayoutGrid, AlertCircle, Clock, Trash2, Plus, Sparkles, Briefcase } from 'lucide-react';
 import { AREAS } from '../seedData';
 
@@ -26,6 +26,8 @@ export function PersonEditorModal({
   const [name, setName] = useState('');
   const [legajo, setLegajo] = useState('');
   const [area, setArea] = useState<Area>('Atención');
+  const [subArea, setSubArea] = useState<string>('');
+  const [puesto, setPuesto] = useState<string>('Atención');
   const [color, setColor] = useState('indigo');
   const [maxDailyHours, setMaxDailyHours] = useState(8);
   const [availStartStr, setAvailStartStr] = useState('08:00');
@@ -42,10 +44,12 @@ export function PersonEditorModal({
       setName(person.name);
       setLegajo(person.legajo || '');
       setArea(person.area);
+      setSubArea(person.subArea || '');
+      setPuesto(person.puesto || '');
       setColor(person.color);
       setMaxDailyHours(person.maxDailyHours);
-      setAvailStartStr(formatHour(person.availabilityStart));
-      setAvailEndStr(formatHour(person.availabilityEnd));
+      setAvailStartStr(formatTimeInput(person.availabilityStart));
+      setAvailEndStr(formatTimeInput(person.availabilityEnd));
       setPossibleShifts(person.possibleShifts || []);
     }
     setTemplateError('');
@@ -58,13 +62,18 @@ export function PersonEditorModal({
     if (!name.trim()) return;
 
     const startVal = parseHour(availStartStr);
-    const endVal = parseHour(availEndStr);
+    let endVal = parseHour(availEndStr);
+    if (endVal === 0 && startVal > 0) {
+      endVal = 24;
+    }
 
     onSave({
       ...person,
       name: name.trim(),
       legajo: legajo.trim() || undefined,
       area,
+      subArea: subArea.trim() || undefined,
+      puesto: puesto.trim() || undefined,
       color,
       maxDailyHours: Number(maxDailyHours),
       availabilityStart: startVal,
@@ -127,8 +136,8 @@ export function PersonEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-lg w-full overflow-hidden text-slate-700 animate-scale-up max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-lg w-full overflow-hidden text-slate-700 animate-scale-up max-h-[92vh] flex flex-col my-auto">
         
         {/* Header */}
         <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -215,10 +224,10 @@ export function PersonEditorModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Area Selector */}
+            {/* Area Principal */}
             <div>
               <label className="block text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
-                <LayoutGrid size={13} className="text-slate-400" /> Área / Departamento
+                <LayoutGrid size={13} className="text-slate-400" /> Área Principal
               </label>
               <select
                 value={area}
@@ -231,6 +240,72 @@ export function PersonEditorModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Segunda Área / Subcategoría */}
+            <div>
+              <label className="block text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
+                <LayoutGrid size={13} className="text-indigo-400" /> 2da Área / Subcategoría
+              </label>
+              <select
+                value={subArea}
+                onChange={(e) => setSubArea(e.target.value)}
+                className="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans font-medium"
+              >
+                <option value="">(Sin subcategoría)</option>
+                {areas.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Puesto de Trabajo */}
+            <div>
+              <label className="block text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
+                <Briefcase size={13} className="text-emerald-500" /> Puesto de Trabajo
+              </label>
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  value={puesto}
+                  onChange={(e) => setPuesto(e.target.value)}
+                  placeholder="Ej. Atención, Admisión Administrativo..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-xs text-slate-800"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPuesto('Atención')}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                      puesto.toLowerCase() === 'atención' || puesto.toLowerCase() === 'atencion'
+                        ? 'bg-emerald-600 text-white border-emerald-700'
+                        : 'bg-slate-100 hover:bg-emerald-50 text-slate-600 border-slate-300'
+                    }`}
+                    title="Fijar como Puesto de Atención (Cuenta como boca de atención)"
+                  >
+                    🛎️ Atención
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPuesto('Admisión Administrativo')}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                      puesto.toLowerCase().includes('administrativ')
+                        ? 'bg-sky-600 text-white border-sky-700'
+                        : 'bg-slate-100 hover:bg-sky-50 text-slate-600 border-slate-300'
+                    }`}
+                    title="Fijar como Admisión Administrativo (Trabajo interno, no suma bocas)"
+                  >
+                    📋 Adm. Administrativo
+                  </button>
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-400 mt-1">
+                Solo quienes tengan puesto "Atención" contarán como bocas de atención funcionando.
+              </p>
             </div>
 
             {/* Max Daily Hours */}

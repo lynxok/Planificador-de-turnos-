@@ -1,6 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Area, Shift, Person, DemandRecord } from '../types';
-import { formatHour, getHourRange, calculateCoverage } from '../utils';
+import { Area, Shift, Person, DemandRecord, AttendanceRecord } from '../types';
+import { 
+  formatHour, 
+  getHourRange, 
+  calculateCoverage, 
+  calculateAgentsRequired, 
+  getDemandConfig, 
+  isAbsenceArea, 
+  isAdministrativeShift,
+  doesAreaMatch, 
+  calculateTheoreticalWaitTime,
+  THEORETICAL_GUARDIA_DEMAND
+} from '../utils';
 import { supabaseControl } from '../supabase';
 import { 
   TrendingUp, 
@@ -21,7 +32,8 @@ import {
   ArrowDownRight, 
   HelpCircle,
   Database,
-  Trash2
+  Trash2,
+  Users
 } from 'lucide-react';
 import { AppTheme } from '../themes';
 import * as XLSX from 'xlsx';
@@ -41,50 +53,7 @@ interface CoverageChartProps {
   onQuickImport?: (importedPersons: Person[], importedShifts: Shift[]) => void;
   demand?: DemandRecord[];
   activeDate?: string;
-}
-
-// Función factorial para Erlang C
-function factorial(n: number): number {
-  if (n === 0 || n === 1) return 1;
-  let f = 1;
-  for (let i = 2; i <= n; i++) f *= i;
-  return f;
-}
-
-// Algoritmo matemático para estimación de tiempo teórico de espera en minutos (Erlang C)
-function calculateTheoreticalWaitTime(
-  artCalls: number,
-  osCalls: number,
-  actualAgents: number,
-  artTime: number = 6, // minutos
-  osTime: number = 4   // minutos
-): number {
-  if (artCalls === 0 && osCalls === 0) return 0;
-  if (actualAgents === 0) return 99; // Indica saturación si hay demanda pero nadie atiende
-  
-  const lambda = artCalls + osCalls;
-  const Ts = (artCalls * artTime + osCalls * osTime) / lambda; // tiempo de servicio promedio ponderado en minutos
-  const TsHrs = Ts / 60;
-  const A = lambda * TsHrs; // intensidad de tráfico
-  
-  if (actualAgents <= A) {
-    // Saturación del sistema (tráfico >= capacidad)
-    return Math.max(30, Math.round(Ts * 5));
-  }
-  
-  // Calcular Pw (Probabilidad de esperar en cola)
-  let sum = 0;
-  for (let i = 0; i < actualAgents; i++) {
-    sum += Math.pow(A, i) / factorial(i);
-  }
-  const term2 = (Math.pow(A, actualAgents) / factorial(actualAgents)) * (actualAgents / (actualAgents - A));
-  const Pw = term2 / (sum + term2);
-  
-  // Tiempo de espera en cola en horas
-  const WqHrs = (Pw * TsHrs) / (actualAgents - A);
-  const WqMin = WqHrs * 60; // a minutos
-  
-  return isNaN(WqMin) ? 0 : Math.round(WqMin * 10) / 10;
+  attendance?: AttendanceRecord[];
 }
 
 export function CoverageChart({
@@ -100,8 +69,11 @@ export function CoverageChart({
   onQuickImport,
   demand = [],
   activeDate,
+  attendance = [],
 }: CoverageChartProps) {
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [hourlyPatientsStats, setHourlyPatientsStats] = useState<{
     art: number[];
     os: number[];
@@ -178,11 +150,65 @@ export function CoverageChart({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hourRange = getHourRange(0, 23, 1);
-  
-  // Filtrar los turnos correspondientes solo a HOY y de la área activa para el gráfico de 24 horas
+  const demandConfig = getDemandConfig();
+
+  // 1. Detección de Colaboradores Ausentes en la Fecha (Franco, Licencias, Vacaciones)
+  const absentPersonIdsOnDate = new Set(
+    shifts
+      .filter(s => s.date === activeDate && isAbsenceArea(s.area))
+      .map(s => s.personId)
+  );
+
+  // Detección de ausencias por control de asistencia (status: 'absent')
+  const attendanceAbsentShiftIds = new Set(
+    (attendance || [])
+      .filter(a => a.dateString === activeDate && a.status === 'absent')
+      .map(a => a.shiftId)
+  );
+
+  // Helper para verificar si un turno corresponde a personal efectivamente atendiendo en el área activa
+  const isShiftFunctioningInActiveArea = (s: Shift) => {
+    if (isAbsenceArea(s.area)) return false;
+    if (absentPersonIdsOnDate.has(s.personId)) return false;
+    if (attendanceAbsentShiftIds.has(s.id)) return false;
+
+    const person = persons.find(p => p.id === s.personId);
+    const isAtencionContext = doesAreaMatch(activeArea, 'Atención') && !isAdministrativeShift(activeArea);
+
+    if (isAtencionContext) {
+      // 1. Si el turno fue asignado a "Admisión Administrativo" (o trabajo administrativo), NO cuenta como boca de atención
+      if (isAdministrativeShift(s.area)) return false;
+
+      // 2. Requisito estricto: Solamente considera a quienes tengan configurado el puesto como "Atención"
+      const puestoNorm = (person?.puesto || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (!puestoNorm.includes('atenci')) return false;
+
+      // 3. Coincidencia por área principal, segunda área (subÁrea / subcategoría) o área del turno
+      const matchesAtencion = 
+        doesAreaMatch(s.area, 'Atención') ||
+        doesAreaMatch(person?.area || '', 'Atención') ||
+        doesAreaMatch(person?.subArea || '', 'Atención');
+
+      return matchesAtencion;
+    }
+
+    // Para cualquier otra área seleccionada (ej. Admisión Administrativo, Soporte, Ventas, etc.)
+    if (isAdministrativeShift(activeArea)) {
+      return isAdministrativeShift(s.area) || isAdministrativeShift(person?.area || '') || isAdministrativeShift(person?.subArea || '');
+    }
+
+    return (
+      doesAreaMatch(s.area, activeArea) ||
+      doesAreaMatch(person?.area || '', activeArea) ||
+      doesAreaMatch(person?.subArea || '', activeArea)
+    );
+  };
+
+  // 2. Filtrar los turnos correspondientes solo a HOY y que estén efectivamente trabajando en puesto
   const todayShifts = shifts.filter(s => s.date === activeDate);
-  
-  // Agregar los desbordes de ayer que siguen activos hoy (para calcular la cobertura real de hoy)
+  const validTodayWorkingShifts = todayShifts.filter(isShiftFunctioningInActiveArea);
+
+  // Agregar los desbordes de ayer que siguen activos hoy (turnos nocturnos efectivos)
   const yesterdayDate = (() => {
     if (!activeDate) return '';
     const d = new Date(activeDate + 'T00:00:00');
@@ -192,46 +218,87 @@ export function CoverageChart({
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
-  
+
   const yesterdayOverflowShifts = activeDate
     ? shifts
         .filter(s => s.date === yesterdayDate && s.startHour + s.duration > 24)
+        .filter(isShiftFunctioningInActiveArea)
         .map(s => ({
           ...s,
           startHour: 0,
           duration: s.startHour + s.duration - 24
         }))
     : [];
-    
-  const combinedShiftsForCoverage = [...todayShifts, ...yesterdayOverflowShifts];
-  const activeAreaTodayShifts = todayShifts.filter(s => s.area === activeArea);
-  
-  // Cobertura real (personas activas por hora)
-  const actualCoverage = calculateCoverage(combinedShiftsForCoverage, activeArea, hourRange);
 
-  // Determinar el objetivo a mostrar: 
-  // Si hay demanda calculada para el día, la usamos en vez de targetCount manual.
-  // Los datos de citas (ART/OS) son del hospital en general, no por área específica.
+  // Turnos combinados de colaboradores efectivamente en su puesto de atención hoy
+  const combinedWorkingShifts = [...validTodayWorkingShifts, ...yesterdayOverflowShifts];
+
+  // Cobertura real horaria (Cantidad de gente efectivamente atendiendo en su puesto)
+  const actualCoverage = hourRange.map(hour => {
+    return combinedWorkingShifts.filter(s => s.startHour <= hour && s.startHour + s.duration > hour).length;
+  });
+
+  // Mapeo detallado de nombres por cada hora:
+  // - quiénes están atendiendo
+  // - quiénes inician turno (entran)
+  // - quiénes finalizan turno (salen)
+  const workingPeopleByHour: Record<number, string[]> = {};
+  const startsPeopleByHour: Record<number, string[]> = {};
+  const endsPeopleByHour: Record<number, string[]> = {};
+
+  hourRange.forEach(hour => {
+    workingPeopleByHour[hour] = combinedWorkingShifts
+      .filter(s => s.startHour <= hour && s.startHour + s.duration > hour)
+      .map(s => persons.find(p => p.id === s.personId)?.name || 'Colaborador');
+
+    startsPeopleByHour[hour] = validTodayWorkingShifts
+      .filter(s => Math.floor(s.startHour) === hour)
+      .map(s => persons.find(p => p.id === s.personId)?.name || 'Colaborador');
+
+    endsPeopleByHour[hour] = validTodayWorkingShifts
+      .filter(s => {
+        let end = Math.floor(s.startHour + s.duration);
+        if (end >= 24) end -= 24;
+        return end === hour;
+      })
+      .map(s => persons.find(p => p.id === s.personId)?.name || 'Colaborador');
+  });
+
+  const startsPerHour = hourRange.map(h => startsPeopleByHour[h]?.length || 0);
+  const endsPerHour = hourRange.map(h => endsPeopleByHour[h]?.length || 0);
+
+  // DETERMINACIÓN DE BOCAS NECESARIAS (TEÓRICO):
+  // Sale directamente del motor de Demanda Erlang C con la configuración de:
+  // - duración del turno / atención (artTime, osTime en minutos)
+  // - tiempo máximo de espera (maxWait en minutos)
+  // - cantidad de pacientes por hora (ART + OS/Particular + Guardia teórica de 60 turnos/día)
   const todaysDemandRecord = activeDate ? demand.find(d => d.dateString === activeDate) : undefined;
-  const effectiveTargetCount = (todaysDemandRecord && todaysDemandRecord.area === activeArea && todaysDemandRecord.hourlyRequirements?.some(r => r > 0))
-    ? todaysDemandRecord.hourlyRequirements 
-    : targetCount;
-
-  // Calcular inicios y fin de turnos por hora (para la área activa de hoy)
-  const startsPerHour = new Array(24).fill(0);
-  const endsPerHour = new Array(24).fill(0);
-
-  activeAreaTodayShifts.forEach(shift => {
-    const start = Math.floor(shift.startHour);
-    let end = Math.floor(shift.startHour + shift.duration);
-    if (end >= 24) end -= 24;
-
-    if (start >= 0 && start < 24) {
-      startsPerHour[start]++;
+  
+  const effectiveTargetCount = hourRange.map(hour => {
+    // Si hay demanda guardada explícitamente en la base de datos para esta área y tiene requisitos > 0
+    if (todaysDemandRecord && todaysDemandRecord.hourlyRequirements && todaysDemandRecord.hourlyRequirements[hour] > 0) {
+      return todaysDemandRecord.hourlyRequirements[hour];
     }
-    if (end >= 0 && end < 24) {
-      endsPerHour[end]++;
+
+    // De lo contrario, calcular en base a pacientes por hora (ART, Obra Social / Particular y Guardia)
+    const art = (todaysDemandRecord?.hourlyArtPatients?.[hour] ?? 0) || (hourlyPatientsStats.art[hour] || 0);
+    const os = (todaysDemandRecord?.hourlyOsPatients?.[hour] ?? 0) || ((hourlyPatientsStats.os[hour] || 0) + (hourlyPatientsStats.particular[hour] || 0));
+    const guardia = (todaysDemandRecord?.hourlyGuardiaPatients?.[hour] ?? THEORETICAL_GUARDIA_DEMAND[hour]) || 0;
+
+    if (art > 0 || os > 0 || guardia > 0) {
+      return calculateAgentsRequired(
+        art, 
+        os, 
+        demandConfig.artTime, 
+        demandConfig.osTime, 
+        demandConfig.maxWait, 
+        demandConfig.sla / 100,
+        guardia,
+        5
+      );
     }
+
+    return targetCount[hour] || 0;
   });
 
   // Métricas generales de cobertura de hoy
@@ -838,33 +905,34 @@ export function CoverageChart({
               const starts = startsPerHour[hour] || 0;
               const ends = endsPerHour[hour] || 0;
 
-              // Identificar personas ingresantes y salientes
-              const peopleStarting = activeAreaTodayShifts
-                .filter(s => Math.floor(s.startHour) === hour)
-                .map(s => persons.find(p => p.id === s.personId)?.name || 'Colaborador');
-
-              const peopleEnding = activeAreaTodayShifts
-                .filter(s => {
-                  let end = Math.floor(s.startHour + s.duration);
-                  if (end >= 24) end -= 24;
-                  return end === hour;
-                })
-                .map(s => persons.find(p => p.id === s.personId)?.name || 'Colaborador');
+              // Identificar personas ingresantes y salientes para esta hora
+              const peopleStarting = startsPeopleByHour[hour] || [];
+              const peopleEnding = endsPeopleByHour[hour] || [];
+              const peopleWorking = workingPeopleByHour[hour] || [];
+              const isSelectedOrHovered = hoveredHour === hour || selectedHour === hour;
 
               return (
-                <div key={hour} className="flex flex-col items-center h-full group min-w-[34px]">
-                  {/* Edición Interactiva u Hovers de información de turnos */}
+                <div 
+                  key={hour} 
+                  onMouseEnter={() => setHoveredHour(hour)}
+                  onMouseLeave={() => setHoveredHour(null)}
+                  onClick={() => setSelectedHour(selectedHour === hour ? null : hour)}
+                  className={`flex flex-col items-center h-full group min-w-[34px] cursor-pointer transition-all relative ${
+                    isSelectedOrHovered ? 'scale-105 z-30' : ''
+                  }`}
+                >
+                  {/* Edición Interactiva */}
                   {isEditingTargets ? (
                     <div className="flex flex-col items-center gap-0.5 mb-1.5">
                       <button
-                        onClick={() => handleIncrementTarget(idx)}
+                        onClick={(e) => { e.stopPropagation(); handleIncrementTarget(idx); }}
                         className="p-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer hover:text-white"
                       >
                         <Plus size={10} />
                       </button>
                       <span className="text-[10px] font-bold text-amber-400 font-mono">{target}</span>
                       <button
-                        onClick={() => handleDecrementTarget(idx)}
+                        onClick={(e) => { e.stopPropagation(); handleDecrementTarget(idx); }}
                         className="p-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer hover:text-white"
                         disabled={target === 0}
                       >
@@ -872,33 +940,33 @@ export function CoverageChart({
                       </button>
                     </div>
                   ) : (
-                    /* Tooltip ultra-detallado que incluye el recuento de turnos por hora, ingresos y egresos detallados */
-                    <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 bg-slate-950/95 border border-[#d4af37]/30 text-[#f1f5f9] text-[10px] rounded-xl p-3 shadow-2xl transition-all pointer-events-none z-50 flex flex-col gap-1.5 whitespace-nowrap">
-                      <div className="font-extrabold text-slate-300 border-b border-white/5 pb-1 flex items-center justify-between">
+                    /* Tooltip hacia abajo (top-full) para evitar que se corte por arriba */
+                    <div className="opacity-0 group-hover:opacity-100 absolute top-full mt-2 bg-slate-950/95 border border-[#d4af37]/40 text-[#f1f5f9] text-[10px] rounded-xl p-3 shadow-2xl transition-all pointer-events-none z-50 flex flex-col gap-1.5 whitespace-nowrap min-w-[180px]">
+                      <div className="font-extrabold text-slate-300 border-b border-white/10 pb-1 flex items-center justify-between">
                         <span>Hora: {formatHour(hour)}hs</span>
-                        <span className="text-[#d4af37]">{daysOfWeekMapping[currentDayOfWeek - 1]?.fullName}</span>
+                        <span className="text-[#d4af37] font-bold">{daysOfWeekMapping[currentDayOfWeek - 1]?.fullName}</span>
                       </div>
                       
                       <div className="flex flex-col gap-0.5">
                         <span className="flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${actualBarColor}`} />
-                          Personal en Cobertura: <strong className="text-white text-xs">{actual}</strong>
+                          <span className={`w-2 h-2 rounded-full ${actualBarColor}`} />
+                          Atendiendo en puesto: <strong className="text-white text-xs font-mono">{actual}</strong>
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60" />
-                          Objetivo Mínimo: <strong className="text-slate-300">{target}</strong>
+                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          Bocas necesarias (Demanda): <strong className="text-amber-300 font-mono">{target}</strong>
                         </span>
                       </div>
 
                       {/* Flujos de turnos que entran o salen */}
                       {(starts > 0 || ends > 0) && (
-                        <div className="border-t border-white/5 pt-1.5 mt-1 space-y-1">
+                        <div className="border-t border-white/10 pt-1.5 mt-1 space-y-1">
                           {starts > 0 && (
                             <div className="text-emerald-400 flex flex-col gap-0.5">
                               <span className="font-bold flex items-center gap-1">
                                 <ArrowUpRight size={11} /> Inician {starts} turno(s):
                               </span>
-                              <span className="text-[9px] pl-3.5 text-slate-350 max-w-[150px] truncate">
+                              <span className="text-[9px] pl-3.5 text-slate-200">
                                 {peopleStarting.join(', ')}
                               </span>
                             </div>
@@ -908,7 +976,7 @@ export function CoverageChart({
                               <span className="font-bold flex items-center gap-1">
                                 <ArrowDownRight size={11} /> Finalizan {ends} turno(s):
                               </span>
-                              <span className="text-[9px] pl-3.5 text-slate-355 max-w-[150px] truncate">
+                              <span className="text-[9px] pl-3.5 text-slate-200">
                                 {peopleEnding.join(', ')}
                               </span>
                             </div>
@@ -916,13 +984,13 @@ export function CoverageChart({
                         </div>
                       )}
 
-                      {isUnderstaffed && <div className="text-rose-400 font-extrabold text-[9px] uppercase tracking-wider mt-1 flex items-center gap-0.5">⚠️ Brecha crítica ({target - actual} vacantes)</div>}
+                      {isUnderstaffed && <div className="text-rose-400 font-extrabold text-[9px] uppercase tracking-wider mt-1 flex items-center gap-0.5">⚠️ Subcobertura ({target - actual} vacantes)</div>}
                       {isPerfect && <div className="text-emerald-400 font-bold text-[9px] uppercase tracking-wider mt-0.5">✓ Cobertura óptima</div>}
                     </div>
                   )}
 
                   {/* Contenedor gráfico de las barras */}
-                  <div className="relative w-full h-[100px] flex items-end justify-center rounded bg-black/30 p-0.5 border border-white/5">
+                  <div className={`relative w-full h-[100px] flex items-end justify-center rounded bg-black/30 p-0.5 border ${isSelectedOrHovered ? 'border-[#d4af37] ring-1 ring-[#d4af37]/40' : 'border-white/5'}`}>
                     {/* Marcador horizontal brillante de Meta de Cobertura */}
                     {target > 0 && (
                       <div
@@ -946,19 +1014,19 @@ export function CoverageChart({
                   {/* Microindicadores físicos de inicios y egresos de turnos por hora */}
                   <div className="h-4 flex items-center justify-center gap-1 mt-1 shrink-0 w-full">
                     {starts > 0 && (
-                      <div className="bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[8px] px-1 rounded-md font-extrabold flex items-center" title={`${starts} turnos inician`}>
+                      <div className="bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[8px] px-1 rounded-md font-extrabold flex items-center" title={`${starts} turnos inician: ${peopleStarting.join(', ')}`}>
                         ▲{starts}
                       </div>
                     )}
                     {ends > 0 && (
-                      <div className="bg-rose-500/15 border border-rose-505/25 text-rose-400 text-[8px] px-1 rounded-md font-extrabold flex items-center" title={`${ends} turnos finalizan`}>
+                      <div className="bg-rose-500/15 border border-rose-505/25 text-rose-400 text-[8px] px-1 rounded-md font-extrabold flex items-center" title={`${ends} turnos finalizan: ${peopleEnding.join(', ')}`}>
                         ▼{ends}
                       </div>
                     )}
                   </div>
 
                   {/* Horarios en el eje X */}
-                  <span className="text-[10px] font-mono text-slate-400 mt-1 font-medium select-none">
+                  <span className={`text-[10px] font-mono mt-1 select-none ${isSelectedOrHovered ? 'text-[#d4af37] font-black' : 'text-slate-400 font-medium'}`}>
                     {hour.toString().padStart(2, '0')}
                   </span>
                   
@@ -979,6 +1047,91 @@ export function CoverageChart({
             })}
           </div>
         </div>
+
+        {/* Panel Interactivo de Flujo de Turnos (Entradas / Salidas / Atención) Abajo del gráfico */}
+        {(() => {
+          const displayH = hoveredHour !== null ? hoveredHour : (selectedHour !== null ? selectedHour : 8);
+          const startsThisHour = startsPeopleByHour[displayH] || [];
+          const endsThisHour = endsPeopleByHour[displayH] || [];
+          const workingThisHour = workingPeopleByHour[displayH] || [];
+          const targetThisH = effectiveTargetCount[displayH] || 0;
+          const actualThisH = actualCoverage[displayH] || 0;
+
+          return (
+            <div className="bg-slate-950/80 border border-[#d4af37]/30 rounded-xl p-3 mt-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs transition-all shadow-lg animate-fade-in">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="px-2.5 py-1 rounded-lg bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#d4af37] font-black font-mono text-sm shadow-inner">
+                  {formatHour(displayH)} hs
+                </div>
+                <div>
+                  <div className="font-extrabold text-white uppercase text-[11px] flex items-center gap-1.5">
+                    <span>Flujo de Turnos a las {formatHour(displayH)} hs</span>
+                    <span className="text-[#d4af37] font-mono">({daysOfWeekMapping[currentDayOfWeek - 1]?.fullName})</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5 font-medium">
+                    <span>Bocas funcionando: <strong className="text-emerald-400 font-bold">{actualThisH}</strong></span>
+                    <span>•</span>
+                    <span>Bocas necesarias: <strong className="text-amber-400 font-bold">{targetThisH}</strong></span>
+                    <span>•</span>
+                    <span className="text-slate-500 italic hidden lg:inline">Pasa el cursor sobre cualquier columna para ver quién entra o sale</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3.5 flex-1 justify-start md:justify-end">
+                {/* Inician Turno (Entran) */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-emerald-400 font-bold text-[10px] flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-md shrink-0">
+                    <ArrowUpRight size={12} /> Entran ({startsThisHour.length}):
+                  </span>
+                  {startsThisHour.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {startsThisHour.map((name, i) => (
+                        <span key={i} className="bg-emerald-950/90 text-emerald-200 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-semibold shadow-xs">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 text-[10px] italic">Sin ingresos</span>
+                  )}
+                </div>
+
+                {/* Finalizan Turno (Salen) */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-rose-400 font-bold text-[10px] flex items-center gap-1 bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 rounded-md shrink-0">
+                    <ArrowDownRight size={12} /> Salen ({endsThisHour.length}):
+                  </span>
+                  {endsThisHour.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {endsThisHour.map((name, i) => (
+                        <span key={i} className="bg-rose-950/90 text-rose-200 border border-rose-500/40 px-2 py-0.5 rounded text-[10px] font-semibold shadow-xs">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 text-[10px] italic">Sin egresos</span>
+                  )}
+                </div>
+
+                {/* Personal Atendiendo */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-sky-400 font-bold text-[10px] flex items-center gap-1 bg-sky-500/10 border border-sky-500/25 px-2 py-0.5 rounded-md shrink-0">
+                    <Users size={12} /> Atendiendo ({workingThisHour.length}):
+                  </span>
+                  {workingThisHour.length > 0 ? (
+                    <span className="text-slate-200 text-[10px] font-medium max-w-[280px] truncate" title={workingThisHour.join(', ')}>
+                      {workingThisHour.join(', ')}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 text-[10px] italic">Ninguno</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Leyenda del gráfico */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 mt-2 text-[10px] text-slate-400 border-t border-white/5 pt-3">
@@ -1009,9 +1162,14 @@ export function CoverageChart({
           
           {/* Fila 1: Bocas Necesarias */}
           <div className="space-y-1">
-            <div className="font-bold text-[#d4af37] uppercase tracking-wider text-[9px] flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]" />
-              <span>Cantidad de bocas de atenciones necesarias (Teórico):</span>
+            <div className="font-bold text-[#d4af37] uppercase tracking-wider text-[9px] flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]" />
+                <span>Cantidad de bocas de atenciones necesarias (Teórico):</span>
+              </div>
+              <span className="text-[8px] text-[#d4af37]/80 font-mono font-normal hidden sm:inline">
+                ⏱️ Config: {demandConfig.artTime}m ART • {demandConfig.osTime}m OS • Espera: {demandConfig.maxWait}m (Calculador de Demanda)
+              </span>
             </div>
             <div className="grid grid-cols-24 gap-1.5 text-center px-1">
               {hourRange.map((hour, idx) => {
@@ -1027,15 +1185,20 @@ export function CoverageChart({
 
           {/* Fila 2: Bocas Funcionando */}
           <div className="space-y-1 border-t border-white/5 pt-2">
-            <div className="font-bold text-emerald-405 uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Cantidad de bocas de atencion funcionando (En su puesto de trabajo):</span>
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center justify-between text-emerald-400">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Cantidad de bocas de atencion funcionando (En su puesto de trabajo):</span>
+              </div>
+              <span className="text-[8px] text-emerald-400/80 font-normal hidden sm:inline">
+                (Efectivamente atendiendo en ventanilla/mesa • Excluye francos y licencias)
+              </span>
             </div>
             <div className="grid grid-cols-24 gap-1.5 text-center px-1">
               {hourRange.map((hour, idx) => {
                 const actual = actualCoverage[idx];
                 const target = effectiveTargetCount[idx];
-                const isUnder = actual < target;
+                const isUnder = actual < target && target > 0;
                 return (
                   <div key={hour} className={`font-mono font-bold select-none ${isUnder ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
                     {actual}
@@ -1102,31 +1265,53 @@ export function CoverageChart({
             </div>
           </div>
 
+          {/* Fila 2.4: Turnos Pacientes Guardia (Teórico) */}
+          <div className="space-y-1 border-t border-white/5 pt-2">
+            <div className="font-bold uppercase tracking-wider text-[9px] flex items-center justify-between text-teal-400">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                <span>Turnos Pacientes Guardia (Teórico - 60 turnos/día):</span>
+              </div>
+              <span className="text-[8px] text-teal-400/80 font-mono">Picos 14h y 17h (8) | Franja 11-18h (44)</span>
+            </div>
+            <div className="grid grid-cols-24 gap-1.5 text-center px-1">
+              {hourRange.map((hour) => {
+                const val = (todaysDemandRecord?.hourlyGuardiaPatients?.[hour] ?? THEORETICAL_GUARDIA_DEMAND[hour]) || 0;
+                return (
+                  <div key={hour} className={`font-mono text-[9px] select-none ${val >= 8 ? 'text-teal-300 font-black underline' : val > 0 ? 'text-teal-400 font-bold' : 'text-slate-500'}`}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Fila 3: Tiempo Teórico de Espera */}
           <div className="space-y-1 border-t border-white/5 pt-2">
-            <div className="font-bold text-sky-405 uppercase tracking-wider text-[9px] flex items-center gap-1.5 text-sky-400">
+            <div className="font-bold text-sky-400 uppercase tracking-wider text-[9px] flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
               <span>Tiempo teorico de espera (Cola estimada):</span>
             </div>
             <div className="grid grid-cols-24 gap-1.5 text-center px-1">
               {hourRange.map((hour, idx) => {
                 const actual = actualCoverage[idx];
-                const art = todaysDemandRecord?.hourlyArtPatients?.[idx] || 0;
-                const os = todaysDemandRecord?.hourlyOsPatients?.[idx] || 0;
+                const art = (todaysDemandRecord?.hourlyArtPatients?.[idx] ?? 0) || (hourlyPatientsStats.art[idx] || 0);
+                const os = (todaysDemandRecord?.hourlyOsPatients?.[idx] ?? 0) || ((hourlyPatientsStats.os[idx] || 0) + (hourlyPatientsStats.particular[idx] || 0));
+                const guardia = (todaysDemandRecord?.hourlyGuardiaPatients?.[idx] ?? THEORETICAL_GUARDIA_DEMAND[idx]) || 0;
                 
-                const waitTime = calculateTheoreticalWaitTime(art, os, actual);
+                const waitTime = calculateTheoreticalWaitTime(art, os, actual, demandConfig.artTime, demandConfig.osTime, guardia, 5);
                 
-                let textColor = 'text-slate-405 text-slate-400';
+                let textColor = 'text-slate-400';
                 let displayText = `${waitTime}m`;
                 
-                if (art === 0 && os === 0) {
+                if (art === 0 && os === 0 && guardia === 0) {
                   displayText = '0m';
                   textColor = 'text-slate-500';
                 } else if (actual === 0) {
                   displayText = 'Sat.';
                   textColor = 'text-rose-500 font-extrabold animate-pulse';
                 } else if (waitTime > 10) {
-                  textColor = 'text-rose-450 text-rose-400 font-bold';
+                  textColor = 'text-rose-400 font-bold';
                 } else if (waitTime > 5) {
                   textColor = 'text-amber-400 font-medium';
                 } else {
@@ -1134,7 +1319,7 @@ export function CoverageChart({
                 }
                 
                 return (
-                  <div key={hour} className={`font-mono text-[9px] select-none ${textColor}`} title={actual === 0 && (art > 0 || os > 0) ? 'Saturado (Sin atención)' : `Espera estimada: ${waitTime} min`}>
+                  <div key={hour} className={`font-mono text-[9px] select-none ${textColor}`} title={actual === 0 && (art > 0 || os > 0 || guardia > 0) ? 'Saturado (Sin atención)' : `Espera estimada: ${waitTime} min`}>
                     {displayText}
                   </div>
                 );

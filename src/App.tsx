@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 import { Person, Shift, Area, TargetCoverage, DemandRecord, AttendanceRecord } from './types';
 import { fetchDb, saveDb } from './api';
 import { SEEDED_PERSONS, INITIAL_SHIFTS, DEFAULT_TARGETS, DAYS_OF_WEEK } from './seedData';
-import { FERIADOS_2026 } from './feriados';
+import { FERIADOS_2026, loadFeriadosFromSupabase } from './feriados';
 import { 
   formatHour, 
   getDayOfWeekFromDate, 
@@ -30,6 +30,7 @@ import { ReportGenerator } from './components/ReportGenerator';
 import { ReportBot } from './components/ReportBot';
 import { GuardiasCalculator } from './components/GuardiasCalculator';
 import { AdmisionPlanner } from './components/AdmisionPlanner';
+import { MonthlySectorPdfExportModal } from './components/MonthlySectorPdfExportModal';
 import { THEMES } from './themes';
 
 // Icons
@@ -56,7 +57,8 @@ import {
   History,
   ShieldCheck,
   Copy,
-  Briefcase
+  Briefcase,
+  Printer
 } from 'lucide-react';
 
 import { SyncLogsModal } from './components/SyncLogsModal';
@@ -122,6 +124,7 @@ export default function App() {
   const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+  const [isMonthlyExportModalOpen, setIsMonthlyExportModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -225,6 +228,7 @@ export default function App() {
 
   // 3. Load & Initialize API
   useEffect(() => {
+    loadFeriadosFromSupabase().catch(() => {});
     fetchDb().then((data) => {
       const loadedPersons = data.persons || [];
       setPersons(loadedPersons);
@@ -1461,6 +1465,15 @@ export default function App() {
                 <span>Importar Excel</span>
               </button>
 
+              <button
+                onClick={() => setIsMonthlyExportModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white rounded-lg cursor-pointer shadow-md"
+                title="Exportar horarios del mes agrupados por sector en un solo archivo PDF"
+              >
+                <Printer size={13} className="text-indigo-100" />
+                <span>Exportar Mes (PDF)</span>
+              </button>
+
               {viewMode !== 'analysis' && viewMode !== 'staff' && viewMode !== 'reports' && viewMode !== 'bot' && viewMode !== 'guardias' && viewMode !== 'admision' && (
                 <>
                   <button
@@ -1837,6 +1850,15 @@ export default function App() {
                     </select>
 
                     <button
+                      onClick={() => setIsMonthlyExportModalOpen(true)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all rounded-lg cursor-pointer ml-1 shadow-2xs"
+                      title="Exportar horarios del mes agrupados por sector en un solo archivo PDF"
+                    >
+                      <Printer size={13} />
+                      <span>PDF Mensual</span>
+                    </button>
+
+                    <button
                       onClick={() => {
                         setModalShift(null);
                         setPreselectedPersonId(undefined);
@@ -1891,6 +1913,7 @@ export default function App() {
                       saveToLocalStorage(importedPersons, importedShifts, targets);
                       setHasUnsavedChanges(true);
                     }}
+                    attendance={attendance}
                   />
                 </div>
               </div>
@@ -1939,7 +1962,7 @@ export default function App() {
         preselectedPersonId={preselectedPersonId}
         onSave={handleSaveModalShift}
         onDelete={modalShift ? () => handleDeleteShift(modalShift.id) : undefined}
-        areas={[...activeAreasList, 'VACACIONES', 'ENFERMEDAD']}
+        areas={[...activeAreasList, 'VACACIONES', 'LICENCIA', 'ENFERMEDAD']}
       />
 
       <ExcelImporterModal
@@ -1948,14 +1971,17 @@ export default function App() {
         persons={persons}
         activeArea={activeArea}
         weekDates={getWeekDates(activeDate)}
+        activeDate={activeDate}
+        allShifts={shifts}
         onImportCompleted={(importedPersons, importedShifts) => {
           setPersons(importedPersons);
           setShifts(importedShifts);
           
-          // Auto-discover areas
+          // Auto-discover areas from both persons and imported shifts
           const newAreas = Array.from(new Set([
              ...areas,
-             ...importedPersons.map(p => p.area)
+             ...importedPersons.map(p => p.area),
+             ...importedShifts.map(s => s.area)
           ]));
           setAreas(newAreas);
 
@@ -1979,6 +2005,15 @@ export default function App() {
         person={editingPerson}
         onSave={handleSavePerson}
         onDelete={handleDeletePersonFromDb}
+        areas={activeAreasList}
+      />
+
+      <MonthlySectorPdfExportModal
+        isOpen={isMonthlyExportModalOpen}
+        onClose={() => setIsMonthlyExportModalOpen(false)}
+        activeDate={activeDate}
+        persons={persons}
+        shifts={shifts}
         areas={activeAreasList}
       />
 

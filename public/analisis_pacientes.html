@@ -294,22 +294,46 @@
 
         <!-- KPI Cards -->
         <div class="row g-3 mb-4">
-            <div class="col-6 col-md-4">
-                <div class="glass-card text-center p-3">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
                     <div class="stat-label">Pacientes Únicos</div>
-                    <div class="stat-value" id="kpiPacientes">0</div>
+                    <div class="stat-value" id="kpiPacientes" style="font-size: 1.8rem;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Población total atendida</div>
                 </div>
             </div>
-            <div class="col-6 col-md-4">
-                <div class="glass-card text-center p-3">
-                    <div class="stat-label">Total RX Realizados</div>
-                    <div class="stat-value" id="kpiTotalRx" style="background: linear-gradient(to right, #fca5a5, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
+                    <div class="stat-label">En Consultorio</div>
+                    <div class="stat-value" id="kpiPacientesCons" style="font-size: 1.8rem; background: linear-gradient(to right, #818cf8, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Total ind. en consultorio</div>
                 </div>
             </div>
-            <div class="col-12 col-md-4">
-                <div class="glass-card text-center p-3">
-                    <div class="stat-label">Promedio RX / Paciente</div>
-                    <div class="stat-value" id="kpiPromedioRx" style="background: linear-gradient(to right, #34d399, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0.0</div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
+                    <div class="stat-label">En Rayos (RX)</div>
+                    <div class="stat-value" id="kpiPacientesRx" style="font-size: 1.8rem; background: linear-gradient(to right, #fca5a5, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Total ind. en rayos</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
+                    <div class="stat-label">Solo Consultorio</div>
+                    <div class="stat-value" id="kpiSoloCons" style="font-size: 1.8rem; background: linear-gradient(to right, #38bdf8, #0284c7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Sin pasar por RX</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
+                    <div class="stat-label">Solo Rayos (RX)</div>
+                    <div class="stat-value" id="kpiSoloRx" style="font-size: 1.8rem; background: linear-gradient(to right, #fbbf24, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Sin pasar por consultorio</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="glass-card text-center p-3 h-100 d-flex flex-column justify-content-center">
+                    <div class="stat-label">Ambos (Cons + RX)</div>
+                    <div class="stat-value" id="kpiAmbosConsRx" style="font-size: 1.8rem; background: linear-gradient(to right, #34d399, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                    <div class="mt-1" style="font-size: 0.68rem; color: var(--text-muted);">Pacientes combinados</div>
                 </div>
             </div>
         </div>
@@ -326,7 +350,7 @@
             </div>
             <div class="col-12 col-md-6">
                 <div class="glass-card">
-                    <div class="card-header-premium">Pacientes por Tipo Consulta</div>
+                    <div class="card-header-premium">Distribución por Sector y Tipo Consulta</div>
                     <div class="chart-container-box" style="height: 350px;">
                         <canvas id="tipoConsultaChart"></canvas>
                     </div>
@@ -465,15 +489,10 @@
 
         async function init() {
             try {
-                Chart.register(ChartDataLabels);
-                // Fechas por defecto: mes activo
-                const hoy = new Date();
-                const hace1Mes = new Date();
-                hace1Mes.setMonth(hace1Mes.getMonth() - 1);
+                if (typeof ChartDataLabels !== 'undefined') {
+                    Chart.register(ChartDataLabels);
+                }
                 
-                document.getElementById('dateHasta').value = hoy.toISOString().split('T')[0];
-                document.getElementById('dateDesde').value = hace1Mes.toISOString().split('T')[0];
-
                 const supabaseUrl = 'https://wbguwmbwutvhqsirtjps.supabase.co';
                 const supabaseAnonKey = 'sb_publishable_HHSflu6QFeTOAOz32W2UdQ_wSQyiPIC';
 
@@ -492,11 +511,46 @@
                     profToType[p.profesional] = p.tipo_consulta;
                 });
 
-                // 2. Traer datos
+                // 2. Determinar fecha máxima en base de datos para inicializar el rango
+                let maxDateStr = new Date().toISOString().split('T')[0];
+                try {
+                    const lastTurnoRes = await fetch(`${supabaseUrl}/rest/v1/planning_patient_appointments?select=turno&order=turno.desc&limit=1`, {
+                        headers: {
+                            'apikey': supabaseAnonKey,
+                            'Authorization': `Bearer ${supabaseAnonKey}`,
+                            'Accept-Profile': 'control_de_horas'
+                        }
+                    });
+                    if (lastTurnoRes.ok) {
+                        const lastTurnoData = await lastTurnoRes.json();
+                        if (lastTurnoData && lastTurnoData.length > 0 && lastTurnoData[0].turno) {
+                            maxDateStr = lastTurnoData[0].turno.substring(0, 10);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("No se pudo obtener fecha máxima, usando fecha actual", e);
+                }
+
+                const maxDObj = new Date(maxDateStr + 'T00:00:00');
+                const minDObj = new Date(maxDObj.getTime() - (30 * 24 * 60 * 60 * 1000));
+                const yyyyMin = minDObj.getFullYear();
+                const mmMin = String(minDObj.getMonth() + 1).padStart(2, '0');
+                const ddMin = String(minDObj.getDate()).padStart(2, '0');
+                const minDateStr = `${yyyyMin}-${mmMin}-${ddMin}`;
+
+                document.getElementById('dateHasta').value = maxDateStr;
+                document.getElementById('dateDesde').value = minDateStr;
+
+                // 3. Traer datos
                 await fetchData();
             } catch (err) {
-                console.error(err);
-                alert("Error cargando dashboard de pacientes");
+                console.error("Error en init:", err);
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.innerHTML = `<h5 class="text-danger font-weight-bold">Error de Conexión</h5>
+                                         <p class="text-white mt-2">${err.message || 'No se pudo conectar a Supabase'}</p>
+                                         <button onclick="location.reload()" class="btn btn-primary mt-3">Reintentar</button>`;
+                }
             }
         }
 
@@ -620,24 +674,60 @@
                 return true;
             });
 
-            // 1. Calcular KPIs
-            const uniquePatients = new Set();
-            let totalRx = 0;
+            // 1. Calcular KPIs con análisis por Sector (Consultorio vs Rayos vs Cruce)
+            const patientSectorMap = new Map(); // patientId -> { hasCons: bool, hasRx: bool, hasOther: bool }
 
             filteredAppointments.forEach(a => {
-                uniquePatients.add(getPatientId(a));
-                if (a.tipo_consulta === 'RX' || (a.cobertura && a.cobertura.toUpperCase().includes('RAYOS'))) {
-                    totalRx++;
+                const pid = getPatientId(a);
+                if (!patientSectorMap.has(pid)) {
+                    patientSectorMap.set(pid, { hasCons: false, hasRx: false, hasOther: false });
+                }
+                const entry = patientSectorMap.get(pid);
+                const prof = (a.profesional || '').toUpperCase();
+                const tip = (a.tipo_consulta || '').toUpperCase();
+                const cob = (a.cobertura || '').toUpperCase();
+
+                const isRx = tip === 'RAYOS' || tip === 'RX' || prof.includes('RX') || cob.includes('RAYOS');
+                const isCons = tip.includes('CONSULTORIO') || (!isRx && !prof.includes('ECO') && !tip.includes('ECO') && !tip.includes('GUARDIA'));
+
+                if (isRx) {
+                    entry.hasRx = true;
+                } else if (isCons) {
+                    entry.hasCons = true;
+                } else {
+                    entry.hasOther = true;
                 }
             });
 
-            const uniqueCount = uniquePatients.size;
-            document.getElementById('kpiPacientes').innerText = uniqueCount.toLocaleString();
-            document.getElementById('kpiTotalRx').innerText = totalRx.toLocaleString();
-            document.getElementById('kpiPromedioRx').innerText = uniqueCount > 0 ? (totalRx / uniqueCount).toFixed(2) : '0.00';
+            let totalPacientes = patientSectorMap.size;
+            let pacientesCons = 0;
+            let pacientesRx = 0;
+            let soloCons = 0;
+            let soloRx = 0;
+            let ambosConsRx = 0;
+
+            patientSectorMap.forEach(info => {
+                if (info.hasCons) pacientesCons++;
+                if (info.hasRx) pacientesRx++;
+
+                if (info.hasCons && !info.hasRx) {
+                    soloCons++;
+                } else if (!info.hasCons && info.hasRx) {
+                    soloRx++;
+                } else if (info.hasCons && info.hasRx) {
+                    ambosConsRx++;
+                }
+            });
+
+            document.getElementById('kpiPacientes').innerText = totalPacientes.toLocaleString();
+            document.getElementById('kpiPacientesCons').innerText = pacientesCons.toLocaleString();
+            document.getElementById('kpiPacientesRx').innerText = pacientesRx.toLocaleString();
+            document.getElementById('kpiSoloCons').innerText = soloCons.toLocaleString();
+            document.getElementById('kpiSoloRx').innerText = soloRx.toLocaleString();
+            document.getElementById('kpiAmbosConsRx').innerText = ambosConsRx.toLocaleString();
 
             // 2. Render Charts
-            renderCharts(filteredAppointments);
+            renderCharts(filteredAppointments, { totalPacientes, soloCons, soloRx, ambosConsRx });
 
             // 3. Render Patient Appointments Table & Footer
             renderPatientsTable();
@@ -741,7 +831,7 @@
             document.getElementById('footPreocup').innerText = preocupCount.toLocaleString();
         }
 
-        function renderCharts(filtered) {
+        function renderCharts(filtered, sectorSummary) {
             const style = getComputedStyle(document.body);
             const accentBg = style.getPropertyValue('--accent-color').trim() || '#6366f1';
 
@@ -751,7 +841,10 @@
                 const m = a.mes;
                 if (!mesesStats[m]) mesesStats[m] = { pacientes: new Set(), rx: 0 };
                 mesesStats[m].pacientes.add(getPatientId(a));
-                if (a.tipo_consulta === 'RX' || (a.cobertura && a.cobertura.toUpperCase().includes('RAYOS'))) {
+                const prof = (a.profesional || '').toUpperCase();
+                const tip = (a.tipo_consulta || '').toUpperCase();
+                const cob = (a.cobertura || '').toUpperCase();
+                if (tip === 'RAYOS' || tip === 'RX' || prof.includes('RX') || cob.includes('RAYOS')) {
                     mesesStats[m].rx++;
                 }
             });
@@ -797,25 +890,35 @@
                 }
             });
 
-            // Group by Tipo Consulta (Unique patients per type)
-            const tipoStats = {};
-            filtered.forEach(a => {
-                const t = a.tipo_consulta;
-                if (!tipoStats[t]) tipoStats[t] = new Set();
-                tipoStats[t].add(getPatientId(a));
-            });
+            // Gráfico de Distribución por Sector y Tipo
+            let labelsSector = [];
+            let dataSector = [];
+            let colorsSector = [];
 
-            const tiposArr = Object.keys(tipoStats).sort((a,b) => tipoStats[b].size - tipoStats[a].size);
-            const pacientesPorTipo = tiposArr.map(t => tipoStats[t].size);
+            if (sectorSummary && (sectorSummary.soloCons > 0 || sectorSummary.soloRx > 0 || sectorSummary.ambosConsRx > 0)) {
+                labelsSector = ['Solo Consultorio', 'Solo Rayos (RX)', 'Ambos (Cons + RX)'];
+                dataSector = [sectorSummary.soloCons, sectorSummary.soloRx, sectorSummary.ambosConsRx];
+                colorsSector = ['#38bdf8', '#fbbf24', '#10b981'];
+            } else {
+                const tipoStats = {};
+                filtered.forEach(a => {
+                    const t = a.tipo_consulta || 'OTRO';
+                    if (!tipoStats[t]) tipoStats[t] = new Set();
+                    tipoStats[t].add(getPatientId(a));
+                });
+                labelsSector = Object.keys(tipoStats).sort((a,b) => tipoStats[b].size - tipoStats[a].size);
+                dataSector = labelsSector.map(t => tipoStats[t].size);
+                colorsSector = ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#64748b'];
+            }
 
             if (tipoConsultaChartInst) tipoConsultaChartInst.destroy();
             tipoConsultaChartInst = new Chart(document.getElementById('tipoConsultaChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: tiposArr,
+                    labels: labelsSector,
                     datasets: [{
-                        data: pacientesPorTipo,
-                        backgroundColor: ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#64748b']
+                        data: dataSector,
+                        backgroundColor: colorsSector
                     }]
                 },
                 options: {

@@ -217,5 +217,25 @@ Para garantizar disponibilidad ininterrumpida, `src/api.ts` implementa una estra
 * Para evitar que la interfaz se reinicie automáticamente al día actual cuando el usuario recarga la página, el estado `activeDate` se almacena y sincroniza en `localStorage`. Al refrescar la aplicación, se restaura automáticamente el día exacto en que se encontraba trabajando el operador.
 
 ---
-*Última actualización: 7 de Octubre, 2026 (Resiliencia de Demanda, Purga de Citas Fantasma, Auto-guardado en Admisión 24/7 y Persistencia de Navegación).*
+
+## 9. Responsividad en Resoluciones Compactas, PDF Mensual por Sector e Importador Matricial
+
+### 9.1. Adaptabilidad y Scroll en Ventanas de Edición (`ShiftEditorModal` y `PersonEditorModal`)
+* **Optimización para Monitores <17" y Escalado de Pantalla (125%–150%)**: Las ventanas emergentes de asignación/edición de turnos y gestión de personal implementan altura dinámica acotada al viewport (`max-h-[92vh]`) con distribución flexible (`flex-col`).
+* **Cabecera y Pie de Acciones Fijos**: El encabezado superior y la barra inferior con los botones **`Guardar Cambios`**, **`Cancelar`** y **`Eliminar`** permanecen siempre anclados y visibles (`shrink-0`), mientras que el cuerpo del formulario cuenta con desplazamiento vertical independiente (`overflow-y-auto overscroll-contain`).
+
+### 9.2. Exportación Mensual de Horarios por Sector en un Único PDF (`MonthlySectorPdfExportModal`)
+* **Accesos Rápidos**: Disponible desde el botón **`PDF Mensual`** junto a `+ Registrar Turno` en el Planificador Diario y desde **`Exportar Mes (PDF)`** en el menú superior de `🛠️ Herramientas`.
+* **Configuración del Reporte**:
+  1. Selecciona el **Mes** y **Año** a exportar (toma por defecto el período activo en pantalla).
+  2. Marca los **Sectores** que deseas incluir (ej. *Admisión*, *ART*, *Facturación*, *KINESIO*) o presiona `Todos`. El sistema agrupa automáticamente a cada colaborador según el sector efectivo de sus turnos en el mes seleccionado.
+  3. Configura opciones de visualización: ocultar personal sin turnos en el mes, incluir cuadros de firma (Jefatura de Sector y RRHH) y resaltar licencias/vacaciones.
+* **Consolidación en un Solo PDF**: Al presionar **`Generar y Guardar PDF`**, se genera un documento apaisado con formato institucional de **SFH ITEO**, resaltado de fines de semana y feriados nacionales, sumatoria de horas mensuales por colaborador y por sector, y saltos de página automáticos (`page-break-after: always`) para que cada sector inicie en su propia hoja dentro de un único archivo PDF.
+
+### 9.3. Importador Matricial Flexible de Planillas Mensuales (`ExcelImporterModal`)
+* **Detección Automática de Matriz Mensual**: Al subir un archivo `.xlsx` o `.csv` desde **`Importar Excel`**, el sistema inspecciona tanto el nombre de las pestañas como el contenido de las primeras filas para detectar automáticamente grillas horizontales de fechas (ya sea en formato serial de Excel, `YYYY-MM-DD` o `DD/MM/YYYY`), sin depender de números de fila fijos.
+* **Vinculación Inteligente y Licencias**: Reconoce apodos habituales de RRHH (diferenciando automáticamente homónimos y alias como *María* vs *Paula* o *Fabiana*), interpreta horarios diurnos y nocturnos (`22:00 a 06:00`) sin distinción de mayúsculas (`a` / `A`), y clasifica automáticamente ausencias (`VACACIONES`, `ENFERMEDAD`, `LICENCIA`, `FRANCO`) preservando intactos los turnos históricos de otros períodos.
+
+---
+*Última actualización: 25 de Noviembre, 2026 (Scroll Responsivo en Modales, Exportador PDF Mensual Unificado por Sector e Importador Matricial Flexible).*
 

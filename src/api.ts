@@ -109,21 +109,42 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
     const { data: rawData, error: dataErr } = await supabase.rpc('fetch_planning_data');
     if (dataErr) throw dataErr;
 
-    const areas: Area[] = rawData.areas && rawData.areas.length > 0
+    const rawAreas: Area[] = rawData.areas && rawData.areas.length > 0
       ? rawData.areas
-      : ['Atención', 'Soporte', 'Ventas', 'Administración'];
+      : ['Atención', 'Admisión Administrativo', 'Soporte', 'Ventas', 'Administración'];
+    const areas: Area[] = rawAreas.includes('Admisión Administrativo')
+      ? rawAreas
+      : [...rawAreas, 'Admisión Administrativo'];
 
-    const persons: Person[] = (rawData.persons || []).map((p: any) => ({
-      id: String(p.id),
-      name: String(p.name),
-      area: String(p.area),
-      maxDailyHours: Number(p.maxDailyHours),
-      availabilityStart: Number(p.availabilityStart),
-      availabilityEnd: Number(p.availabilityEnd),
-      color: String(p.color),
-      legajo: p.legajo ? String(p.legajo) : undefined,
-      possibleShifts: p.possibleShifts || []
-    }));
+    let localPersonsMeta: Record<string, { puesto?: string; subArea?: string }> = {};
+    try {
+      const savedMeta = localStorage.getItem('CHRONOS_PERSONS_META');
+      if (savedMeta) localPersonsMeta = JSON.parse(savedMeta);
+    } catch (e) {}
+
+    const persons: Person[] = (rawData.persons || []).map((p: any) => {
+      const pId = String(p.id);
+      const rawPossible = Array.isArray(p.possibleShifts) ? p.possibleShifts : [];
+      const metaEntry = rawPossible.find((item: any) => item && item._meta === true);
+      const cleanPossibleShifts = rawPossible.filter((item: any) => !item || !item._meta);
+
+      const resolvedSubArea = p.subArea || metaEntry?.subArea || localPersonsMeta[pId]?.subArea;
+      const resolvedPuesto = p.puesto || metaEntry?.puesto || localPersonsMeta[pId]?.puesto;
+
+      return {
+        id: pId,
+        name: String(p.name),
+        area: String(p.area),
+        subArea: resolvedSubArea ? String(resolvedSubArea) : undefined,
+        puesto: resolvedPuesto ? String(resolvedPuesto) : undefined,
+        maxDailyHours: Number(p.maxDailyHours),
+        availabilityStart: Number(p.availabilityStart),
+        availabilityEnd: Number(p.availabilityEnd),
+        color: String(p.color),
+        legajo: p.legajo ? String(p.legajo) : undefined,
+        possibleShifts: cleanPossibleShifts
+      };
+    });
 
     const shifts: Shift[] = (rawData.shifts || []).map((s: any) => ({
       id: String(s.id),
@@ -165,7 +186,8 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
           area: 'Admision', // defaulted to Admision to match backend
           hourlyRequirements: Array(24).fill(0),
           hourlyArtPatients: Array(24).fill(0),
-          hourlyOsPatients: Array(24).fill(0)
+          hourlyOsPatients: Array(24).fill(0),
+          hourlyGuardiaPatients: Array(24).fill(0)
         };
       }
       
@@ -200,7 +222,8 @@ export const fetchDb = async (): Promise<DatabaseSchema> => {
           area: area,
           hourlyRequirements: reqs,
           hourlyArtPatients: Array(24).fill(0),
-          hourlyOsPatients: Array(24).fill(0)
+          hourlyOsPatients: Array(24).fill(0),
+          hourlyGuardiaPatients: row.hourlyGuardiaPatients || Array(24).fill(0)
         };
       }
     });
@@ -241,6 +264,35 @@ export const saveDb = async (data: Partial<DatabaseSchema>) => {
     const demandToSave = payloadForRpc.demand;
     delete payloadForRpc.demand;
     
+    // Persistir puesto y subArea tanto en localStorage como dentro de possibleShifts (JSONB en Supabase)
+    if (payloadForRpc.persons) {
+      let localPersonsMeta: Record<string, { puesto?: string; subArea?: string }> = {};
+      try {
+        const savedMeta = localStorage.getItem('CHRONOS_PERSONS_META');
+        if (savedMeta) localPersonsMeta = JSON.parse(savedMeta);
+      } catch (e) {}
+
+      payloadForRpc.persons = payloadForRpc.persons.map(p => {
+        localPersonsMeta[p.id] = {
+          puesto: p.puesto,
+          subArea: p.subArea
+        };
+        const cleanPossible = (p.possibleShifts || []).filter((item: any) => !item || !item._meta);
+        const enrichedPossible = (p.puesto || p.subArea)
+          ? [...cleanPossible, { _meta: true, puesto: p.puesto, subArea: p.subArea } as any]
+          : cleanPossible;
+
+        return {
+          ...p,
+          possibleShifts: enrichedPossible
+        };
+      });
+
+      try {
+        localStorage.setItem('CHRONOS_PERSONS_META', JSON.stringify(localPersonsMeta));
+      } catch (e) {}
+    }
+
     // Ensure all areas referenced in shifts, persons, or areas array exist in planning_areas table
     if (payloadForRpc.shifts || payloadForRpc.persons || payloadForRpc.areas) {
       const shiftAreas = (payloadForRpc.shifts || []).map(s => s.area).filter(Boolean);
@@ -250,10 +302,13 @@ export const saveDb = async (data: Partial<DatabaseSchema>) => {
         ...passedAreas,
         ...shiftAreas,
         ...personAreas,
+        'Atención',
+        'Admisión Administrativo',
         'Admisión General',
         'Admisión ART',
         'Admisión',
         'VACACIONES',
+        'LICENCIA',
         'FRANCO',
         'ENFERMEDAD',
         'FERIADO'

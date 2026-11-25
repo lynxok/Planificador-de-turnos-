@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { DemandRecord } from '../types';
+import { getDemandConfig, saveDemandConfig, THEORETICAL_GUARDIA_DEMAND } from '../utils';
 import { 
   Clock, 
   UploadCloud, 
@@ -45,15 +46,17 @@ function calculateAgentsRequired(
   artServiceTime: number,  // minutos
   osServiceTime: number,   // minutos
   targetWaitTime: number,  // minutos
-  slaTarget: number        // SLA, ej. 0.85
+  slaTarget: number,       // SLA, ej. 0.85
+  guardiaCalls: number = 0, // turnos de guardia
+  guardiaServiceTime: number = 5 // minutos atención guardia
 ): number {
-  if (artCalls === 0 && osCalls === 0) return 0;
+  if (artCalls === 0 && osCalls === 0 && guardiaCalls === 0) return 0;
   
   // Tasa de llegada total (lambda) por hora
-  const lambda = artCalls + osCalls;
+  const lambda = artCalls + osCalls + guardiaCalls;
   
   // Tiempo de servicio promedio ponderado (Ts) en horas
-  const totalServiceTimeHours = (artCalls * artServiceTime + osCalls * osServiceTime) / 60;
+  const totalServiceTimeHours = (artCalls * artServiceTime + osCalls * osServiceTime + guardiaCalls * guardiaServiceTime) / 60;
   const Ts = totalServiceTimeHours / lambda;
   
   // Intensidad de tráfico (A)
@@ -93,15 +96,22 @@ function formatHourRange(hour: number): string {
 }
 
 export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, activeArea, onSaveDemand }: Props) {
-  // Parámetros globales de Buenas Prácticas
-  const [artTime, setArtTime] = useState<number>(6); // minutos, por defecto 6
-  const [osTime, setOsTime] = useState<number>(4);  // minutos, por defecto 4
-  const [maxWait, setMaxWait] = useState<number>(8); // minutos, por defecto 8
-  const [sla, setSla] = useState<number>(85);       // %, por defecto 85%
+  // Parámetros globales de Buenas Prácticas (sincronizados con localStorage)
+  const initialConfig = getDemandConfig();
+  const [artTime, setArtTime] = useState<number>(initialConfig.artTime);
+  const [osTime, setOsTime] = useState<number>(initialConfig.osTime);
+  const [maxWait, setMaxWait] = useState<number>(initialConfig.maxWait);
+  const [sla, setSla] = useState<number>(initialConfig.sla);
+
+  // Persistir cambios para el cálculo global de cobertura
+  useEffect(() => {
+    saveDemandConfig({ artTime, osTime, maxWait, sla });
+  }, [artTime, osTime, maxWait, sla]);
 
   // Grilla horaria de demanda (24 horas)
   const [hourlyArt, setHourlyArt] = useState<number[]>(Array(24).fill(0));
   const [hourlyOs, setHourlyOs] = useState<number[]>(Array(24).fill(0));
+  const [hourlyGuardia, setHourlyGuardia] = useState<number[]>([...THEORETICAL_GUARDIA_DEMAND]);
 
   // Estado para la carga rápida por lotes
   const [batchStartHour, setBatchStartHour] = useState<number>(8);
@@ -184,6 +194,7 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
     for (const record of sortedRecords) {
       const artPatients = record.hourlyArtPatients || Array(24).fill(0);
       const osPatients = record.hourlyOsPatients || Array(24).fill(0);
+      const guardiaPatients = record.hourlyGuardiaPatients || THEORETICAL_GUARDIA_DEMAND;
       
       let dayPolHours = 0;
       let dayNoPolHours = 0;
@@ -192,16 +203,18 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
       for (let h = 0; h < 24; h++) {
         const art = artPatients[h] || 0;
         const os = osPatients[h] || 0;
-        dayTotalPatients += art + os;
+        const guardia = guardiaPatients[h] || 0;
+        dayTotalPatients += art + os + guardia;
 
         // Polivalente
-        const pol = calculateAgentsRequired(art, os, artTime, osTime, maxWait, sla / 100);
+        const pol = calculateAgentsRequired(art, os, artTime, osTime, maxWait, sla / 100, guardia, 5);
         dayPolHours += pol;
 
         // Islas (No Polivalente)
         const recArt = calculateAgentsRequired(art, 0, artTime, osTime, maxWait, sla / 100);
         const recOs = calculateAgentsRequired(0, os, artTime, osTime, maxWait, sla / 100);
-        dayNoPolHours += (recArt + recOs);
+        const recGuardia = calculateAgentsRequired(0, 0, artTime, osTime, maxWait, sla / 100, guardia, 5);
+        dayNoPolHours += (recArt + recOs + recGuardia);
       }
 
       polTotalHours += dayPolHours;
@@ -247,9 +260,11 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
       if (existing) {
         setHourlyArt(existing.hourlyArtPatients || Array(24).fill(0));
         setHourlyOs(existing.hourlyOsPatients || Array(24).fill(0));
+        setHourlyGuardia(existing.hourlyGuardiaPatients || [...THEORETICAL_GUARDIA_DEMAND]);
       } else {
         setHourlyArt(Array(24).fill(0));
         setHourlyOs(Array(24).fill(0));
+        setHourlyGuardia([...THEORETICAL_GUARDIA_DEMAND]);
       }
       setLogs([]);
       setFileImportedCount(null);
@@ -267,7 +282,9 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
         artTime,
         osTime,
         maxWait,
-        sla / 100
+        sla / 100,
+        hourlyGuardia[h],
+        5
       );
     });
 
@@ -277,7 +294,8 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
       area: targetArea,
       hourlyRequirements: requirements,
       hourlyArtPatients: hourlyArt,
-      hourlyOsPatients: hourlyOs
+      hourlyOsPatients: hourlyOs,
+      hourlyGuardiaPatients: hourlyGuardia
     };
     
     const updatedDemandList = [...filtered, currentRecord];
@@ -304,16 +322,20 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
   if (!isOpen) return null;
 
   // Modificación de un valor particular en la grilla
-  const handleCellChange = (hour: number, type: 'art' | 'os', value: string) => {
+  const handleCellChange = (hour: number, type: 'art' | 'os' | 'guardia', value: string) => {
     const num = Math.max(0, parseInt(value, 10) || 0);
     if (type === 'art') {
       const updated = [...hourlyArt];
       updated[hour] = num;
       setHourlyArt(updated);
-    } else {
+    } else if (type === 'os') {
       const updated = [...hourlyOs];
       updated[hour] = num;
       setHourlyOs(updated);
+    } else {
+      const updated = [...hourlyGuardia];
+      updated[hour] = num;
+      setHourlyGuardia(updated);
     }
   };
 
@@ -341,7 +363,14 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
     if (window.confirm('¿Deseas restablecer todos los valores de demanda de hoy a cero?')) {
       setHourlyArt(Array(24).fill(0));
       setHourlyOs(Array(24).fill(0));
+      setHourlyGuardia(Array(24).fill(0));
     }
+  };
+
+  // Aplicar curva de guardia teórica (60 turnos)
+  const handleApplyTheoreticalGuardia = () => {
+    setHourlyGuardia([...THEORETICAL_GUARDIA_DEMAND]);
+    setLogs(prev => [...prev, 'Aplicada curva de demanda teórica de guardia (60 turnos diarios).']);
   };
 
   // Guardar y persistir la curva de 24 horas
@@ -356,7 +385,9 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
         artTime,
         osTime,
         maxWait,
-        sla / 100
+        sla / 100,
+        hourlyGuardia[h],
+        5
       );
     });
 
@@ -366,7 +397,8 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
       area: targetArea,
       hourlyRequirements: requirements,
       hourlyArtPatients: hourlyArt,
-      hourlyOsPatients: hourlyOs
+      hourlyOsPatients: hourlyOs,
+      hourlyGuardiaPatients: hourlyGuardia
     };
 
     onSaveDemand([...filtered, newRecord]);
@@ -572,7 +604,8 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
   // Resumen del día actual
   const totalArtPac = hourlyArt.reduce((sum, val) => sum + val, 0);
   const totalOsPac = hourlyOs.reduce((sum, val) => sum + val, 0);
-  const totalPac = totalArtPac + totalOsPac;
+  const totalGuardiaPac = hourlyGuardia.reduce((sum, val) => sum + val, 0);
+  const totalPac = totalArtPac + totalOsPac + totalGuardiaPac;
 
   // 1. Requisitos Polivalentes (Esquema unificado eficiente)
   const polRequirements = Array(24).fill(0).map((_, h) => {
@@ -582,12 +615,14 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
       artTime,
       osTime,
       maxWait,
-      sla / 100
+      sla / 100,
+      hourlyGuardia[h],
+      5
     );
   });
   const totalHoursPol = polRequirements.reduce((sum, val) => sum + val, 0);
 
-  // 2. Requisitos No Polivalentes (Esquema fragmentado ineficiente: ART y OS por separado)
+  // 2. Requisitos No Polivalentes (Esquema fragmentado ineficiente: ART, OS y Guardia por separado)
   const artOnlyRequirements = Array(24).fill(0).map((_, h) => {
     return calculateAgentsRequired(
       hourlyArt[h],
@@ -610,8 +645,21 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
     );
   });
 
+  const guardiaOnlyRequirements = Array(24).fill(0).map((_, h) => {
+    return calculateAgentsRequired(
+      0,
+      0,
+      artTime,
+      osTime,
+      maxWait,
+      sla / 100,
+      hourlyGuardia[h],
+      5
+    );
+  });
+
   const noPolRequirements = Array(24).fill(0).map((_, h) => {
-    return artOnlyRequirements[h] + osOnlyRequirements[h];
+    return artOnlyRequirements[h] + osOnlyRequirements[h] + guardiaOnlyRequirements[h];
   });
   const totalHoursNoPol = noPolRequirements.reduce((sum, val) => sum + val, 0);
 
@@ -817,6 +865,16 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
 
                 <button
                   type="button"
+                  onClick={handleApplyTheoreticalGuardia}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 transition-all cursor-pointer"
+                  title="Cargar la curva de demanda de guardia teórica (60 turnos/día)"
+                >
+                  <Zap size={13} className="text-teal-600" />
+                  <span>Curva Guardia (60)</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleClearAll}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-250 bg-white hover:bg-red-50 hover:text-red-650 text-slate-705 transition-all cursor-pointer"
                   title="Limpiar todos los inputs del día"
@@ -908,16 +966,18 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
             <div className="border border-slate-200 bg-white rounded-2xl overflow-hidden flex flex-col min-h-[250px] max-h-[360px] shadow-sm">
               <div className="grid grid-cols-12 gap-1 bg-slate-50 border-b border-slate-200 px-4 py-2 text-[10px] uppercase tracking-wider font-extrabold text-slate-500 text-center items-center select-none">
                 <div className="col-span-2 text-left">Rango Horario</div>
-                <div className="col-span-2">Pacientes ART</div>
-                <div className="col-span-2">Obra Social / Part.</div>
-                <div className="col-span-3 text-indigo-650 bg-indigo-50 border border-indigo-100 py-1 rounded-xl">Polivalente (Pool Único)</div>
-                <div className="col-span-3 text-rose-650 bg-rose-50 border border-rose-100 py-1 rounded-xl">Esquema Islas (Dedicado)</div>
+                <div className="col-span-2 text-blue-700">Pacientes ART</div>
+                <div className="col-span-2 text-purple-700">Obra Social / Part.</div>
+                <div className="col-span-2 text-teal-700">Guardia (Teórico)</div>
+                <div className="col-span-2 text-indigo-650 bg-indigo-50 border border-indigo-100 py-1 rounded-xl">Polivalente</div>
+                <div className="col-span-2 text-rose-650 bg-rose-50 border border-rose-100 py-1 rounded-xl">Esquema Islas</div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100">
                 {Array.from({ length: 24 }).map((_, h) => {
                   const artVal = hourlyArt[h] || 0;
                   const osVal = hourlyOs[h] || 0;
+                  const guardiaVal = hourlyGuardia[h] || 0;
                   
                   // Calcular admisores recomendados para esta hora (Polivalente unificado)
                   const recStaff = calculateAgentsRequired(
@@ -926,13 +986,16 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
                     artTime,
                     osTime,
                     maxWait,
-                    sla / 100
+                    sla / 100,
+                    guardiaVal,
+                    5
                   );
 
                   // Calcular admisores recomendados en Islas (Separados)
                   const recArt = calculateAgentsRequired(artVal, 0, artTime, osTime, maxWait, sla / 100);
                   const recOs = calculateAgentsRequired(0, osVal, artTime, osTime, maxWait, sla / 100);
-                  const recNoPol = recArt + recOs;
+                  const recGuardia = calculateAgentsRequired(0, 0, artTime, osTime, maxWait, sla / 100, guardiaVal, 5);
+                  const recNoPol = recArt + recOs + recGuardia;
 
                   return (
                     <div key={h} className="grid grid-cols-12 gap-1 px-4 py-1.5 items-center text-center hover:bg-slate-50/50 transition-colors">
@@ -968,32 +1031,49 @@ export function DemandCalculatorModal({ isOpen, onClose, demand, activeDate, act
                         />
                       </div>
 
+                      {/* Inputs Guardia (Teórico) */}
+                      <div className="col-span-2 px-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="200"
+                          value={guardiaVal === 0 ? '' : guardiaVal}
+                          placeholder="0"
+                          onChange={(e) => handleCellChange(h, 'guardia', e.target.value)}
+                          className={`w-full text-center text-xs font-mono font-bold border rounded-lg py-1 px-1.5 focus:outline-none transition-all ${
+                            guardiaVal >= 8 
+                              ? 'border-teal-400 bg-teal-50/80 text-teal-800 font-black' 
+                              : 'border-slate-200 hover:border-slate-350 focus:border-teal-500 bg-slate-50/40 text-teal-700 focus:bg-white'
+                          }`}
+                          title={guardiaVal >= 8 ? `Hora Pico de Guardia: ${guardiaVal} turnos` : `Guardia: ${guardiaVal} turnos`}
+                        />
+                      </div>
+
                       {/* Dotación Recomendada Polivalente */}
-                      <div className="col-span-3 flex justify-center">
+                      <div className="col-span-2 flex justify-center">
                         <div className={`px-2.5 py-1 rounded-xl text-center text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0 ${
                           recStaff > 0 
                             ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-[0_0_6px_rgba(99,102,241,0.1)] font-extrabold' 
                             : 'bg-slate-100 text-slate-400 border border-slate-200'
                         }`}>
                           <Users size={12} className={recStaff > 0 ? 'text-indigo-500' : 'text-slate-400'} />
-                          <span>{recStaff} {recStaff === 1 ? 'Admisor' : 'Admisores'}</span>
+                          <span>{recStaff}</span>
                         </div>
                       </div>
 
                       {/* Dotación Recomendada No Polivalente (Islas) */}
-                      <div className="col-span-3 flex justify-center">
-                        <div className={`px-2 py-1 rounded-xl text-center text-[10px] font-bold border transition-all shadow-xs flex items-center gap-1.5 shrink-0 ${
+                      <div className="col-span-2 flex justify-center">
+                        <div className={`px-2 py-1 rounded-xl text-center text-[10px] font-bold border transition-all shadow-xs flex items-center gap-1 shrink-0 ${
                           recNoPol > 0 
                             ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-[0_0_6px_rgba(244,63,94,0.1)]' 
                             : 'bg-slate-100 text-slate-400 border border-slate-200'
                         }`}>
-                          <div className="flex items-center gap-1">
-                            <span className="bg-blue-100/80 text-blue-700 px-1 rounded font-mono text-[9px]" title={`Admisores dedicados a ART: ${recArt}`}>ART:{recArt}</span>
-                            <span>+</span>
-                            <span className="bg-purple-100/80 text-purple-700 px-1 rounded font-mono text-[9px]" title={`Admisores dedicados a OS: ${recOs}`}>OS:{recOs}</span>
-                          </div>
-                          <span>=</span>
-                          <span className="font-black text-xs font-mono bg-rose-600 text-white px-1.5 py-0.5 rounded-md shadow-sm" title={`Total en Islas: ${recNoPol} Admisores`}>{recNoPol}</span>
+                          <span className="font-mono text-[9px] text-slate-500" title={`ART:${recArt} + OS:${recOs} + Guardia:${recGuardia}`}>
+                            {recArt}+{recOs}+{recGuardia}=
+                          </span>
+                          <span className="font-black text-xs font-mono bg-rose-600 text-white px-1.5 py-0.5 rounded-md shadow-sm" title={`Total en Islas: ${recNoPol} Admisores`}>
+                            {recNoPol}
+                          </span>
                         </div>
                       </div>
                     </div>

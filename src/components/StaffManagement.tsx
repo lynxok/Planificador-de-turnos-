@@ -99,7 +99,8 @@ export function StaffManagement({
             <tr className="bg-slate-50 border-b border-slate-250 text-slate-600 font-extrabold text-[10px] uppercase tracking-wider">
               <th className="px-5 py-3.5">Colaborador</th>
               <th className="px-5 py-3.5">Legajo / ID</th>
-              <th className="px-5 py-3.5">Área / Depto</th>
+              <th className="px-5 py-3.5">Área / Subcategoría</th>
+              <th className="px-5 py-3.5">Puesto</th>
               <th className="px-5 py-3.5">Disp. Horaria</th>
               <th className="px-5 py-3.5">Límite Horario</th>
               <th className="px-5 py-3.5 text-right">Acciones</th>
@@ -108,13 +109,14 @@ export function StaffManagement({
           <tbody className="divide-y divide-slate-150 text-slate-700 text-xs">
             {filteredPersons.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-slate-400 font-medium">
+                <td colSpan={7} className="text-center py-12 text-slate-400 font-medium">
                   No se encontraron colaboradores que coincidan con la búsqueda.
                 </td>
               </tr>
             ) : (
               filteredPersons.map(p => {
                 const colorTheme = colorClasses[p.color] || colorClasses.indigo;
+                const isAtencionPuesto = (p.puesto || '').toLowerCase().includes('atenci') || p.area === 'Atención' || p.subArea === 'Atención';
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                     {/* Colaborador */}
@@ -132,11 +134,29 @@ export function StaffManagement({
                       </span>
                     </td>
                     
-                    {/* Área */}
-                    <td className="px-5 py-3 font-semibold flex-row items-center gap-1">
-                      <span className="inline-flex items-center gap-1 bg-indigo-50/40 text-indigo-700 px-2 py-0.5 rounded-lg border border-indigo-100/40 font-semibold text-[11px]">
-                        <Grid size={11} className="text-indigo-400" />
-                        {p.area}
+                    {/* Área y Subcategoría */}
+                    <td className="px-5 py-3">
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="inline-flex items-center gap-1 bg-indigo-50/70 text-indigo-700 px-2 py-0.5 rounded-lg border border-indigo-100 font-semibold text-[11px]">
+                          <Grid size={11} className="text-indigo-500" />
+                          {p.area}
+                        </span>
+                        {p.subArea && (
+                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200 text-[10px] font-bold" title="Segunda Área / Subcategoría">
+                            + {p.subArea}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Puesto */}
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold border ${
+                        isAtencionPuesto
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {p.puesto || (p.area === 'Atención' ? 'Atención' : 'Sin asignar')}
                       </span>
                     </td>
                     

@@ -153,4 +153,4 @@ export const DAYS_OF_WEEK = [
   { value: 7, label: 'Domingo' }
 ];
 
-export const AREAS: Area[] = ['Atención', 'Soporte', 'Ventas', 'Administración'];
+export const AREAS: Area[] = ['Atención', 'Admisión Administrativo', 'Soporte', 'Ventas', 'Administración'];

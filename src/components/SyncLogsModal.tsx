@@ -28,6 +28,7 @@ export const SyncLogsModal: React.FC<SyncLogsModalProps> = ({ isOpen, onClose })
       const { data, error } = await supabase
         .from('planning_sync_logs')
         .select('*')
+        .neq('source', 'FERIADOS_CONFIG')
         .order('created_at', { ascending: false })
         .limit(15);
       

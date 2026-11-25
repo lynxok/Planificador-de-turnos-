@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Person, Shift, Area } from '../types';
-import { formatHour, getHourRange, getDayOfWeekFromDate } from '../utils';
+import { formatHour, getHourRange, getDayOfWeekFromDate, doesAreaMatch, isAdministrativeShift } from '../utils';
 import { Edit2, Trash2, Clock, AlertTriangle, ChevronLeft, ChevronRight, Plus, Eye, MonitorPlay, Search, X, User, Filter } from 'lucide-react';
 import { AppTheme } from '../themes';
 import { FERIADOS_2026 } from '../feriados';
@@ -46,7 +46,7 @@ export function TimelineGrid({
 
   // Filter persons based on active area tab AND search name AND external sidebar filter AND shifts presence
   const activePersons = persons.filter((p) => {
-    const matchesArea = activeArea === 'Todos' || p.area === activeArea;
+    const matchesArea = activeArea === 'Todos' || doesAreaMatch(p.area, activeArea) || doesAreaMatch(p.subArea || '', activeArea);
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSidebarFilter = !selectedPersonFilterId || p.id === selectedPersonFilterId;
 
@@ -150,7 +150,7 @@ export function TimelineGrid({
       personId: targetPersonId,
       date: targetDateStr,
       startHour: Math.max(0, adjustedStartHour),
-      area: targetPerson.area,
+      area: targetPersonId === shift.personId ? shift.area : targetPerson.area,
     });
 
     setDraggedShiftId(null);
@@ -314,7 +314,7 @@ export function TimelineGrid({
                   (s) => s.personId === row.person.id && s.date === yesterdayDate && s.startHour + s.duration > 24
                 );
                 
-                const totalHours = todayShifts.reduce((acc, shift) => acc + shift.duration, 0);
+                const totalHours = todayShifts.filter(s => s.area !== "VACACIONES" && s.area !== "LICENCIA" && s.area !== "ENFERMEDAD" && s.area !== "ENFERMO").reduce((acc, shift) => acc + shift.duration, 0);
                 const isOverworked = totalHours > row.person.maxDailyHours;
 
                 return (
@@ -335,22 +335,58 @@ export function TimelineGrid({
                           </span>
                         )}
                       </div>
-                      <div className={`flex items-center gap-1.5 justify-between text-[9px] ${theme.cardTextMuted}`}>
-                        {viewMode === 'day' ? (
-                          <span className="font-semibold bg-slate-100 text-slate-600 px-1 rounded">{row.person.area}</span>
+                      <div className={`flex items-center gap-1 justify-between text-[9px] ${theme.cardTextMuted}`}>
+                        <div className="flex items-center gap-1 truncate">
+                          {viewMode === 'day' ? (
+                            <span className="font-semibold bg-slate-100 text-slate-600 px-1 rounded truncate">{row.person.area}</span>
+                          ) : (
+                            <span 
+                              title={FERIADOS_2026[row.dateStr] ? `🎉 Feriado Nacional: ${FERIADOS_2026[row.dateStr]}` : undefined}
+                              className={`font-bold px-1 rounded-sm uppercase tracking-wide text-[8px] flex items-center gap-0.5 border ${
+                                FERIADOS_2026[row.dateStr]
+                                  ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs font-extrabold'
+                                  : 'text-indigo-700 bg-indigo-50 border-transparent'
+                              }`}
+                            >
+                              {row.dayLabel} {FERIADOS_2026[row.dateStr] ? '🎉' : ''}
+                            </span>
+                          )}
+                          {row.person.puesto && (
+                            <span
+                              className={`px-1 rounded text-[8px] font-bold truncate ${
+                                row.person.puesto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('atenci')
+                                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                  : 'bg-sky-100 text-sky-700 border border-sky-200'
+                              }`}
+                              title={`Puesto configurado: ${row.person.puesto}`}
+                            >
+                              {row.person.puesto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('atenci') ? '🛎️ Boca' : '📋 Admin'}
+                            </span>
+                          )}
+                        </div>
+                        {totalHours > 0 ? (
+                          <span className="font-mono">{totalHours} hrs</span>
                         ) : (
-                          <span 
-                            title={FERIADOS_2026[row.dateStr] ? `🎉 Feriado Nacional: ${FERIADOS_2026[row.dateStr]}` : undefined}
-                            className={`font-bold px-1 rounded-sm uppercase tracking-wide text-[8px] flex items-center gap-0.5 border ${
-                              FERIADOS_2026[row.dateStr]
-                                ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs font-extrabold'
-                                : 'text-indigo-700 bg-indigo-50 border-transparent'
-                            }`}
-                          >
-                            {row.dayLabel} {FERIADOS_2026[row.dateStr] ? '🎉' : ''}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-[8px] text-slate-400">Sin turno</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onAddShift({
+                                  personId: row.person.id,
+                                  date: row.dateStr,
+                                  startHour: 0,
+                                  duration: 24,
+                                  area: 'FRANCO' as Area
+                                });
+                              }}
+                              className="px-1 py-0.2 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-600 border border-amber-500/30 rounded text-[8px] font-bold transition-all cursor-pointer"
+                              title="Asignar día Franco"
+                            >
+                              + Franco
+                            </button>
+                          </div>
                         )}
-                        <span className="font-mono">{totalHours > 0 ? `${totalHours} hrs` : 'Sin turno'}</span>
                       </div>
                     </div>
 
@@ -389,7 +425,7 @@ export function TimelineGrid({
                         };
 
                         const isOvernight = shift.startHour + shift.duration > 24;
-                        const isAbsence = shift.area === 'VACACIONES' || shift.area === 'ENFERMEDAD' || shift.area === 'ENFERMO';
+                        const isAbsence = shift.area === 'VACACIONES' || shift.area === 'LICENCIA' || shift.area === 'ENFERMEDAD' || shift.area === 'ENFERMO' || shift.area === 'FRANCO';
 
                         // Custom style for absence background repeating patterns
                         const customStyle: React.CSSProperties = {
@@ -398,10 +434,16 @@ export function TimelineGrid({
                           minWidth: '40px'
                         };
 
+                        const isAdminShift = isAdministrativeShift(shift.area);
+
                         let customBg = palette.bg;
                         let customBorder = isOvernight ? 'border-amber-400 ring-1 ring-amber-300/30' : '';
 
-                        if (shift.area === 'VACACIONES') {
+                        if (shift.area === 'FRANCO') {
+                          customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #d97706, #d97706 8px, #b45309 8px, #b45309 16px)';
+                          customBg = 'text-white';
+                          customBorder = 'border-amber-600 shadow-md ring-1 ring-amber-400/40';
+                        } else if (shift.area === 'VACACIONES' || shift.area === 'LICENCIA') {
                           customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #475569, #475569 8px, #334155 8px, #334155 16px)';
                           customBg = 'text-white';
                           customBorder = 'border-slate-500 shadow-md';
@@ -409,6 +451,9 @@ export function TimelineGrid({
                           customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #dc2626, #dc2626 8px, #991b1b 8px, #991b1b 16px)';
                           customBg = 'text-white';
                           customBorder = 'border-red-650 shadow-md';
+                        } else if (isAdminShift) {
+                          customBg = 'bg-sky-700 text-white';
+                          customBorder = 'border-sky-400 shadow-sm ring-1 ring-sky-300/30';
                         }
 
                         return (
@@ -426,7 +471,7 @@ export function TimelineGrid({
                             {isAbsence ? (
                               <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-black text-white px-0.5">
                                 <span className="truncate flex items-center gap-1">
-                                  {shift.area === 'VACACIONES' ? '🏝️ VACACIONES' : '🤒 ENFERMEDAD'}
+                                  {shift.area === 'FRANCO' ? '☕ FRANCO' : (shift.area === 'VACACIONES' ? '🏝️ VACACIONES' : (shift.area === 'LICENCIA' ? '🏖️ LICENCIA' : '🤒 ENFERMEDAD'))}
                                 </span>
                                 
                                 <div className="opacity-0 group-hover/shift:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-slate-950/80 px-1 py-0.5 rounded text-white">
@@ -449,8 +494,13 @@ export function TimelineGrid({
                             ) : (
                               <>
                                 <div className="flex items-center justify-between gap-1 w-full overflow-hidden text-[9px] font-bold">
-                                  <span className="truncate">
-                                    {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.duration)}
+                                  <span className="truncate flex items-center gap-1">
+                                    <span className="bg-black/25 px-1 rounded text-[8px] font-extrabold shrink-0">
+                                      {isAdminShift ? '📋 Admin' : '🛎️ Atención'}
+                                    </span>
+                                    <span>
+                                      {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.duration)}
+                                    </span>
                                   </span>
                                   
                                   <div className="opacity-0 group-hover/shift:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-slate-900/80 px-1 py-0.5 rounded ml-1 text-white">

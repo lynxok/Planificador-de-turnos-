@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Person, Shift, Area } from '../types';
-import { formatHour, parseHour, checkOverlap, getOverlappingShift } from '../utils';
+import { formatHour, formatTimeInput, parseHour, checkOverlap, getOverlappingShift } from '../utils';
 import { X, Clock, Trash2, ShieldCheck, User, LayoutGrid } from 'lucide-react';
 import { DAYS_OF_WEEK, AREAS } from '../seedData';
 import { FERIADOS_2026 } from '../feriados';
@@ -74,7 +74,7 @@ export function ShiftEditorModal({
     if (shift) {
       setPersonId(shift.personId);
       setDateStr((shift as any).date || selectedDate);
-      setStartHourStr(formatHour(shift.startHour));
+      setStartHourStr(formatTimeInput(shift.startHour));
       setDuration(shift.duration);
       setArea(shift.area);
     } else {
@@ -119,8 +119,9 @@ export function ShiftEditorModal({
       duration,
     };
 
-    const overlap = getOverlappingShift(candidate as any, shifts);
-    if (overlap) {
+    const isAbsenceType = area === 'FRANCO' || area === 'VACACIONES' || area === 'ENFERMEDAD' || area === 'LICENCIA';
+    const overlap = !isAbsenceType ? getOverlappingShift(candidate as any, shifts) : undefined;
+    if (overlap && !['FRANCO', 'VACACIONES', 'ENFERMEDAD', 'LICENCIA'].includes(overlap.area)) {
       setErrorWord(`¡Error de superposición! Esta persona ya tiene asignado otro turno el mismo día en el rango de ${formatHour(overlap.startHour)} a ${formatHour(overlap.startHour + overlap.duration)}.`);
       return;
     }
@@ -149,11 +150,11 @@ export function ShiftEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden text-slate-700 animate-scale-up">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-md w-full max-h-[92vh] flex flex-col text-slate-700 animate-scale-up my-auto overflow-hidden">
         
         {/* Header */}
-        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
               <Clock size={18} />
@@ -170,8 +171,11 @@ export function ShiftEditorModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleFormSubmit} className="p-5 text-xs space-y-4">
+        {/* Form */}
+        <form onSubmit={handleFormSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          
+          {/* Scrollable Form Body */}
+          <div className="p-5 text-xs space-y-4 overflow-y-auto flex-1 overscroll-contain">
           
           {errorWord && (
             <div className="bg-rose-50 border border-rose-100 text-rose-600 rounded-lg p-3 font-medium">
@@ -223,7 +227,7 @@ export function ShiftEditorModal({
                         key={idx}
                         type="button"
                         onClick={() => {
-                          setStartHourStr(formatHour(ps.startHour));
+                          setStartHourStr(formatTimeInput(ps.startHour));
                           setDuration(ps.duration);
                         }}
                         className="px-2.5 py-1.5 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors text-xs rounded-md shadow-sm font-semibold cursor-pointer active:scale-95 flex items-center gap-1.5"
@@ -255,7 +259,7 @@ export function ShiftEditorModal({
             {/* Area Selector (can override default area) */}
             <div>
               <label className="block text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
-                <LayoutGrid size={13} className="text-slate-400" /> Área de Operación
+                <LayoutGrid size={13} className="text-slate-400" /> Área / Rol del Turno
               </label>
               <select
                 value={area}
@@ -267,14 +271,66 @@ export function ShiftEditorModal({
                     {a}
                   </option>
                 ))}
+                {!areas.includes('Atención') && <option value="Atención">🛎️ Atención (Ventanilla / Boca)</option>}
+                {!areas.includes('Admisión Administrativo') && <option value="Admisión Administrativo">📋 Admisión Administrativo (Back Office)</option>}
+                {!areas.includes('FRANCO') && <option value="FRANCO">☕ FRANCO (Día Libre)</option>}
+                {!areas.includes('VACACIONES') && <option value="VACACIONES">🏝️ VACACIONES</option>}
+                {!areas.includes('ENFERMEDAD') && <option value="ENFERMEDAD">🤒 ENFERMEDAD / LICENCIA</option>}
               </select>
             </div>
           </div>
 
-          {/* Quick Absence Shortcuts */}
+          {/* Quick Role Mode: Atención vs Admisión Administrativo */}
+          <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">Modalidad del Turno:</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setArea('Atención')}
+                className={`px-2.5 py-1.5 border text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95 ${
+                  area === 'Atención'
+                    ? 'bg-emerald-600 border-emerald-700 text-white shadow-sm'
+                    : 'bg-white hover:bg-emerald-50 border-slate-250 text-slate-700'
+                }`}
+                title="Turno de atención en ventanilla / boca (Cuenta para bocas funcionando si el puesto es Atención)"
+              >
+                🛎️ Atención (Boca)
+              </button>
+              <button
+                type="button"
+                onClick={() => setArea('Admisión Administrativo')}
+                className={`px-2.5 py-1.5 border text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95 ${
+                  area === 'Admisión Administrativo'
+                    ? 'bg-sky-600 border-sky-700 text-white shadow-sm'
+                    : 'bg-white hover:bg-sky-50 border-slate-250 text-slate-700'
+                }`}
+                title="Turno de trabajo administrativo interno de admisión (No suma a las bocas de turnera)"
+              >
+                📋 Admisión Administrativo
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Absence / Franco Shortcuts */}
           <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 flex items-center justify-between gap-2.5">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Ausencia Rápida:</span>
-            <div className="flex gap-2">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Licencia / Franco:</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setArea('FRANCO');
+                  setStartHourStr('00:00');
+                  setDuration(24);
+                }}
+                className={`px-2.5 py-1.5 border text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95 ${
+                  area === 'FRANCO' 
+                    ? 'bg-amber-500 border-amber-600 text-white shadow-sm' 
+                    : 'bg-white hover:bg-amber-50/60 border-slate-250 text-slate-700'
+                }`}
+                title="Marcar día como Franco (No laboral)"
+              >
+                ☕ Franco
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -282,7 +338,11 @@ export function ShiftEditorModal({
                   setStartHourStr('00:00');
                   setDuration(24);
                 }}
-                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-250 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                className={`px-2.5 py-1.5 border text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95 ${
+                  area === 'VACACIONES' 
+                    ? 'bg-indigo-600 border-indigo-700 text-white shadow-sm' 
+                    : 'bg-white hover:bg-slate-100 border-slate-250 text-slate-700'
+                }`}
                 title="Marcar vacaciones por 24 horas"
               >
                 🏝️ Vacaciones
@@ -294,7 +354,11 @@ export function ShiftEditorModal({
                   setStartHourStr('00:00');
                   setDuration(24);
                 }}
-                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-250 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                className={`px-2.5 py-1.5 border text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95 ${
+                  area === 'ENFERMEDAD' 
+                    ? 'bg-rose-600 border-rose-700 text-white shadow-sm' 
+                    : 'bg-white hover:bg-slate-100 border-slate-250 text-slate-700'
+                }`}
                 title="Marcar enfermedad/licencia por 24 horas"
               >
                 🤒 Enfermedad
@@ -452,8 +516,10 @@ export function ShiftEditorModal({
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-4">
+          </div> {/* End Scrollable Form Body */}
+
+          {/* Action buttons (Sticky bottom footer) */}
+          <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50/90 backdrop-blur-xs shrink-0">
             {shift && onDelete ? (
               <button
                 type="button"
@@ -474,7 +540,7 @@ export function ShiftEditorModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-500 font-semibold cursor-pointer active:scale-95 transition-all"
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 font-semibold cursor-pointer active:scale-95 transition-all"
               >
                 Cancelar
               </button>
